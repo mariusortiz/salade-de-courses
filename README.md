@@ -5,13 +5,20 @@ Projet de famille, fait avec le moteur de jeu [Godot](https://godotengine.org) :
 
 ## Jouer
 
+Dans le navigateur, sans rien installer : <https://mariusortiz.github.io/salade-de-courses/>
+
+Pour modifier le jeu, il faut Godot :
+
 1. Installer Godot 4.7 ou plus récent (gratuit) : <https://godotengine.org/download>
 2. Ouvrir Godot, cliquer sur « Importer », choisir le fichier `project.godot` de ce dossier.
 3. Appuyer sur F5 (ou le bouton ▶ en haut à droite).
 
 - 1 joueur : les flèches, ou Z Q S D.
 - 2 joueurs sur le même écran : joueur 1 les flèches, joueur 2 Z Q S D.
-- Manette : le stick pour tourner, A pour accélérer, B pour freiner.
+- Manette : le stick pour tourner, A pour accélérer, B pour freiner, X ou RB pour déraper.
+- Déraper : tenir Espace (ou Maj) en tournant. À deux : Entrée pour le joueur 1, Espace pour le joueur 2.
+  Le kart se met en travers et des étincelles apparaissent. Quand elles deviennent jaunes puis roses,
+  relâcher donne un turbo.
 
 Si le kart sort de la piste, il y est reposé au bout de deux secondes.
 
@@ -57,10 +64,19 @@ godot --headless --path . --fixed-fps 60 -- --simulation
 
 Chaque kart doit arriver. « Retours en piste » compte les fois où un kart est sorti de la route.
 
+## Mettre en ligne
+
+```
+./publier.sh
+```
+
+Le script exporte le jeu pour le navigateur et l'envoie sur GitHub Pages (branche `gh-pages`).
+Il faut avoir installé une fois les modèles d'export Web de Godot (Éditeur > Gérer les modèles d'export).
+
 ## Idées pour la suite
 
 Le turbo et le tremplin sont là pour tester. Les vrais bonus, pièges et circuits sont à inventer :
-des objets à ramasser, des dérapages, des bruitages, un chrono du meilleur tour, de nouveaux décors.
+des objets à ramasser, des bruitages, un chrono du meilleur tour, de nouveaux décors.
 
 ## Règles du projet
 

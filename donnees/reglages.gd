@@ -14,6 +14,12 @@ const TURBO_FORCE := 1.6      # 1.6 = 60 % plus vite pendant un turbo
 const TURBO_DUREE := 1.5      # en secondes
 const NIVEAU_ORDIS := 0.9     # vitesse des karts de l'ordinateur (1 = aussi rapides que toi)
 
+# Le dérapage
+const DERAPAGE_GLISSE := 0.35       # petit = le kart glisse beaucoup en dérapage
+const DERAPAGE_PETIT_TURBO := 0.8   # secondes de dérapage pour gagner un petit turbo
+const DERAPAGE_GRAND_TURBO := 1.8   # secondes de dérapage pour gagner un grand turbo
+const COULEUR_ETINCELLES := ["#ffffff", "#ffd54f", "#ff4081"]  # au début, petit turbo, grand turbo
+
 # Le décor
 const HAUTEUR_BARRIERES := 0.9
 const NOMBRE_ARBRES := 60

@@ -16,6 +16,8 @@ var course: Node
 # Pour les essais automatiques (voir le README, partie « Vérifier »).
 var essai_circuit := -1
 var capture := ""
+var essai_derapage := ""
+var essai_trace := 0.0
 
 
 func _ready() -> void:
@@ -25,6 +27,8 @@ func _ready() -> void:
 			essai_circuit = 0
 		elif option.begins_with("--capture="):
 			capture = option.trim_prefix("--capture=")
+		elif option.begins_with("--essai-derapage="):
+			essai_derapage = option.trim_prefix("--essai-derapage=")
 		elif option.begins_with("--circuit="):
 			choix["circuit"] = int(option.trim_prefix("--circuit="))
 		elif option.begins_with("--joueurs="):
@@ -33,6 +37,16 @@ func _ready() -> void:
 		_simuler()
 	elif capture != "":
 		_lancer(true)
+	elif essai_derapage != "":
+		_lancer(false)
+		# Le joueur 1 accélère, dérape à droite de 2 s à 3 s en contre-braquant, puis relâche.
+		course.scenario = func(t: float) -> Array:
+			var volant := 0.0
+			if t >= 2.0 and t < 2.1:
+				volant = 1.0
+			elif t >= 2.1 and t < 3.0:
+				volant = -1.0
+			return [Vector2(volant, 1.0), t >= 2.0 and t < 3.0]
 	else:
 		_montrer_menu()
 
@@ -66,14 +80,14 @@ func _montrer_menu() -> void:
 	_rangee(colonne, Circuits.CIRCUITS.map(func(c): return c["nom"]), choix["circuit"], func(i): choix["circuit"] = i)
 
 	var demarrer := _bouton("Démarrer", Color("#ff7043"), ENCRE, 34)
-	demarrer.add_theme_color_override("font_color", Color.WHITE)
-	demarrer.add_theme_color_override("font_hover_color", Color.WHITE)
+	for etat in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+		demarrer.add_theme_color_override(etat, Color.WHITE)
 	demarrer.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	demarrer.pressed.connect(func(): _lancer(false))
 	colonne.add_child(demarrer)
 	demarrer.grab_focus()
 
-	var aide := "Joueur 1 : les flèches. Joueur 2 : Z Q S D." if choix["joueurs"] == 2 else "Pour conduire : les flèches ou Z Q S D. Une manette marche aussi."
+	var aide := "Joueur 1 : les flèches, Entrée pour déraper. Joueur 2 : Z Q S D, Espace pour déraper." if choix["joueurs"] == 2 else "Pour conduire : les flèches ou Z Q S D. Pour déraper : Espace en tournant."
 	_titre(colonne, aide, 18)
 
 
@@ -183,9 +197,19 @@ func _montrer_resultats(classement: Array) -> void:
 # ── Les essais automatiques ──────────────────────────────────
 
 func _process(_dt: float) -> void:
-	if capture != "" and course != null and course.temps > 4.0:
+	if capture != "" and essai_derapage == "" and course != null and course.temps > 4.0:
 		get_viewport().get_texture().get_image().save_png(capture)
 		get_tree().quit()
+	if essai_derapage != "" and course != null:
+		var kart = course.vues[0]["kart"]
+		if course.temps >= essai_trace:
+			essai_trace += 0.25
+			print("t=%.2f dérapage=%.0f charge=%.2f turbo=%.2f vitesse=%.1f" % [course.temps, kart.derapage, kart.charge, kart.turbo, kart.vitesse])
+		if course.temps > 2.8 and capture == "":
+			capture = "fait"
+			get_viewport().get_texture().get_image().save_png(essai_derapage)
+		if course.temps > 4.0:
+			get_tree().quit()
 
 
 # Fait courir les ordinateurs seuls sur chaque circuit et écrit le résultat.

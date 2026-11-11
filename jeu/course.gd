@@ -17,6 +17,7 @@ var temps := -3.5   # négatif pendant le compte à rebours
 var fin := -1.0
 var annoncee := false
 var demo := false   # true = l'ordinateur conduit aussi les karts des joueurs
+var scenario := Callable()  # pour les essais : remplace le clavier du joueur 1
 
 
 func demarrer(circuit: Dictionary, humains: Array) -> void:
@@ -115,6 +116,17 @@ func _lire(joueur: int) -> Vector2:
 	return Vector2(clampf(volant, -1.0, 1.0), clampf(gaz, -1.0, 1.0))
 
 
+# Le bouton de dérapage. Seul : Espace ou Maj. À deux : Entrée pour le joueur 1, Espace pour le joueur 2.
+func _derape(joueur: int) -> bool:
+	var touches: Array = [KEY_SPACE, KEY_SHIFT]
+	if vues.size() > 1:
+		touches = [KEY_ENTER] if joueur == 0 else [KEY_SPACE]
+	for t in touches:
+		if Input.is_physical_key_pressed(t):
+			return true
+	return Input.is_joy_button_pressed(joueur, JOY_BUTTON_RIGHT_SHOULDER) or Input.is_joy_button_pressed(joueur, JOY_BUTTON_X)
+
+
 # ── Le déroulement ───────────────────────────────────────────
 
 func _physics_process(dt: float) -> void:
@@ -123,6 +135,11 @@ func _physics_process(dt: float) -> void:
 		return
 	for i in vues.size():
 		vues[i]["kart"].commande = _lire(i)
+		vues[i]["kart"].bouton_derapage = _derape(i)
+	if scenario.is_valid():
+		var ordres: Array = scenario.call(temps)
+		vues[0]["kart"].commande = ordres[0]
+		vues[0]["kart"].bouton_derapage = ordres[1]
 	var but: float = piste.longueur * piste.tours
 	for kart in karts:
 		kart.actif = true

@@ -13,6 +13,7 @@ var humain := false
 var auto := true          # true = conduit par l'ordinateur
 var actif := false        # false pendant le compte à rebours
 var commande := Vector2.ZERO  # x = volant (-1 gauche, 1 droite), y = gaz (-1 à 1)
+var bouton_derapage := false
 
 var vmax := 30.0
 var acceleration := 20.0
@@ -26,6 +27,12 @@ var turbo := 0.0
 var au_sol := false
 var normale := Vector3.UP # l'inclinaison du sol sous le kart
 var penche := 0.0
+
+var derapage := 0.0       # 0 = non, -1 = dérapage à gauche, 1 = à droite
+var charge := 0.0         # depuis combien de secondes on dérape
+var travers := 0.0        # l'angle du kart mis en travers
+var etincelles: Array = []
+var lueur := StandardMaterial3D.new()
 
 var position_piste := 0.0 # où est le kart sur le tour, en mètres depuis le départ
 var distance := 0.0       # distance totale parcourue depuis la ligne de départ
@@ -67,8 +74,23 @@ func preparer(le_pilote: Dictionary, la_piste: Node3D, est_humain: bool) -> void
 	boule.continuous_cd = true
 	add_child(boule)
 
-	visuel = Fruit.creer(pilote)
+	visuel = Node3D.new()
+	visuel.add_child(Fruit.creer(pilote))
 	add_child(visuel)
+
+	# Les étincelles du dérapage, sous les roues arrière.
+	lueur.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	var etincelle := SphereMesh.new()
+	etincelle.radius = 0.22
+	etincelle.height = 0.44
+	for x in [-0.8, 0.8]:
+		var m := MeshInstance3D.new()
+		m.mesh = etincelle
+		m.material_override = lueur
+		m.position = Vector3(x, 0.15, 1.15)
+		m.visible = false
+		visuel.add_child(m)
+		etincelles.append(m)
 
 
 # Pose le kart sur la piste, à une distance du départ et décalé sur le côté.
@@ -122,6 +144,30 @@ func _physics_process(dt: float) -> void:
 			turbo = R.TURBO_DUREE
 	turbo = maxf(0.0, turbo - dt)
 
+	# Le dérapage : on appuie sur le bouton en tournant, le kart se met en travers.
+	# Plus on tient longtemps, plus le turbo est fort quand on relâche.
+	var bouton := actif and not auto and bouton_derapage
+	if derapage == 0.0:
+		if bouton and au_sol and absf(volant) > 0.3 and vitesse > vmax * 0.5:
+			derapage = signf(volant)
+			charge = 0.0
+	elif not bouton or vitesse < vmax * 0.3:
+		if not bouton and charge >= R.DERAPAGE_GRAND_TURBO:
+			turbo = R.TURBO_DUREE
+		elif not bouton and charge >= R.DERAPAGE_PETIT_TURBO:
+			turbo = R.TURBO_DUREE * 0.5
+		derapage = 0.0
+	elif au_sol:
+		charge += dt
+	if derapage != 0.0:
+		volant = derapage * 0.6 + volant * 0.5  # on tourne toujours du côté du dérapage
+	travers = lerpf(travers, derapage * 0.45, minf(1.0, dt * 8.0))
+	var niveau := 0 if derapage == 0.0 else (2 if charge >= R.DERAPAGE_GRAND_TURBO else (1 if charge >= R.DERAPAGE_PETIT_TURBO else 0))
+	lueur.albedo_color = Color(R.COULEUR_ETINCELLES[niveau])
+	for e in etincelles:
+		e.visible = derapage != 0.0
+		e.scale = Vector3.ONE * (0.6 + 0.4 * niveau + 0.15 * sin(charge * 40.0))
+
 	# La vitesse. On ne change que la vitesse vers l'avant : la gravité et les chocs
 	# restent gérés par le moteur physique.
 	var direction := Vector3(-sin(cap), 0, -cos(cap))
@@ -146,7 +192,7 @@ func _physics_process(dt: float) -> void:
 		if v_avant > limite:
 			v_avant = maxf(limite, v_avant - 30.0 * dt)
 
-		v_cote *= exp(-R.ADHERENCE * dt)
+		v_cote *= exp(-R.ADHERENCE * (R.DERAPAGE_GLISSE if derapage != 0.0 else 1.0) * dt)
 		boule.linear_velocity = avant * v_avant + v_cote + normale * v_haut
 		vitesse = v_avant
 
@@ -179,7 +225,7 @@ func _process(_dt: float) -> void:
 	var direction := Vector3(-sin(cap), 0, -cos(cap))
 	var avant := (direction - normale * direction.dot(normale)).normalized()
 	var droite := avant.cross(normale).normalized()
-	var base := Basis(droite, normale, -avant).rotated(avant, -penche)
+	var base := Basis(droite, normale, -avant).rotated(avant, -penche).rotated(normale, -travers)
 	visuel.global_transform = Transform3D(base, boule.global_position - normale * RAYON)
 
 
