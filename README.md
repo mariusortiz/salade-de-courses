@@ -13,12 +13,20 @@ Pour modifier le jeu, il faut Godot :
 2. Ouvrir Godot, cliquer sur « Importer », choisir le fichier `project.godot` de ce dossier.
 3. Appuyer sur F5 (ou le bouton ▶ en haut à droite).
 
-- 1 joueur : les flèches, ou Z Q S D.
-- 2 joueurs sur le même écran : joueur 1 les flèches, joueur 2 Z Q S D.
-- Manette : le stick pour tourner, A pour accélérer, B pour freiner, X ou RB pour déraper.
-- Déraper : tenir Espace (ou Maj) en tournant. À deux : Entrée pour le joueur 1, Espace pour le joueur 2.
-  Le kart se met en travers et des étincelles apparaissent. Quand elles deviennent jaunes puis roses,
-  relâcher donne un turbo.
+| Action | 1 joueur | À deux : joueur 1 | À deux : joueur 2 | Manette |
+| --- | --- | --- | --- | --- |
+| Conduire | flèches ou Z Q S D | flèches | Z Q S D | stick, A accélérer, B freiner |
+| Déraper | Maj | J (ou Entrée) | Maj | RB |
+| Sauter | Espace | K | Espace | LB |
+| Tirer un pépin | F (ou Entrée) | L | F | X |
+| Utiliser l'objet | E | M | E | Y |
+
+- Déraper : tenir le bouton en tournant. Le kart se met en travers et des étincelles apparaissent.
+  Quand elles deviennent jaunes puis roses, relâcher donne un turbo.
+- Les cagettes sur la route donnent un bonus au hasard : des pépins à tirer (un kart touché fait
+  un tête-à-queue), un turbo, un bouclier, ou du jus à verser derrière soi pour ralentir les autres.
+  Les pépins se tirent tout de suite ; le turbo, le bouclier et le jus se gardent en réserve.
+- Sauter permet de passer au-dessus d'une flaque de jus ou d'un pépin.
 
 Si le kart sort de la piste, il y est reposé au bout de deux secondes.
 
@@ -28,21 +36,21 @@ Trois fichiers sont faits pour être changés. Chacun commence par son mode d'em
 
 | Fichier | Ce qu'on y change |
 | --- | --- |
-| `donnees/circuits.gd` | Les circuits : la liste des points par où passe la route (avec leur hauteur), les turbos, les tremplins |
-| `donnees/pilotes.gd` | Les fruits : nom, forme, couleurs, vitesse, accélération, maniabilité, modèle 3D |
-| `donnees/reglages.gd` | Le titre, la gravité, l'adhérence, la force du turbo, le niveau des ordinateurs, les couleurs |
+| `donnees/circuits.gd` | Les circuits : la liste des points par où passe la route (avec leur hauteur), les turbos, les tremplins, les cagettes à bonus, la musique |
+| `donnees/pilotes.gd` | Les fruits : nom, forme, motif de la peau, couleurs, vitesse, accélération, maniabilité, modèle 3D |
+| `donnees/reglages.gd` | Le titre, la gravité, l'adhérence, le turbo, le saut, les bonus, le volume de la musique, le niveau des ordinateurs, le décor, les couleurs |
 
 Le reste du code est dans `jeu/` :
 
-- `piste.gd` construit la route, les barrières et le décor à partir des points du circuit ;
+- `piste.gd` construit la route, les barrières, les cagettes et le décor à partir des points du circuit, et dessine les textures ;
 - `kart.gd` gère la conduite (une boule qui roule sur la piste, avec le fruit posé dessus) ;
-- `fruit.gd` dessine le fruit et son kart ;
-- `course.gd` gère le départ, les écrans des joueurs et le classement ;
-- `main.gd` gère le menu.
+- `fruit.gd` dessine le fruit (avec ses bras et ses jambes) et son kart ;
+- `course.gd` gère le départ, les touches, les bonus, les écrans des joueurs et le classement ;
+- `main.gd` gère le menu et la musique.
 
 ## Utiliser des modèles 3D
 
-Les fruits et les karts sont faits de formes simples en attendant mieux. Pour les remplacer :
+Les fruits et les karts sont assemblés à partir de formes simples (boules, tubes, boîtes). Pour les remplacer par un modèle :
 
 1. Trouver un modèle gratuit au format `.glb`. Bonnes adresses, sous licence CC0 (libre, sans obligation) :
    [Kenney](https://kenney.nl/assets), [Quaternius](https://quaternius.com), [Poly Pizza](https://poly.pizza)
@@ -54,6 +62,14 @@ Les fruits et les karts sont faits de formes simples en attendant mieux. Pour le
 
 Noter dans `modeles/CREDITS.md` d'où vient chaque modèle et sa licence.
 
+## Changer la musique
+
+Les musiques sont dans le dossier `musique/` (format `.mp3` ou `.ogg`). Celle du menu et celle de
+l'arrivée se choisissent dans `donnees/reglages.gd`, celle de chaque circuit dans `donnees/circuits.gd`.
+Comme le dépôt est public, on n'y met que de la musique sous licence CC0, et on note sa provenance
+dans `musique/CREDITS.md`. Les musiques de Pixabay ne conviennent pas : leur licence interdit de les
+redistribuer telles quelles.
+
 ## Vérifier que tout marche
 
 Faire courir les ordinateurs seuls sur tous les circuits, sans ouvrir de fenêtre :
@@ -63,6 +79,8 @@ godot --headless --path . --fixed-fps 60 -- --simulation
 ```
 
 Chaque kart doit arriver. « Retours en piste » compte les fois où un kart est sorti de la route.
+
+Pour voir tous les pilotes de face dans une image : `godot --path . -- --galerie=/chemin/image.png`.
 
 ## Mettre en ligne
 
@@ -75,8 +93,8 @@ Il faut avoir installé une fois les modèles d'export Web de Godot (Éditeur > 
 
 ## Idées pour la suite
 
-Le turbo et le tremplin sont là pour tester. Les vrais bonus, pièges et circuits sont à inventer :
-des objets à ramasser, des bruitages, un chrono du meilleur tour, de nouveaux décors.
+De nouveaux bonus et de nouveaux pièges, des bruitages (moteur, pépin, cagette), un chrono du
+meilleur tour, de nouveaux circuits et de nouveaux décors.
 
 ## Règles du projet
 

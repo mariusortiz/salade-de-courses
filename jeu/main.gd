@@ -17,18 +17,26 @@ var course: Node
 var essai_circuit := -1
 var capture := ""
 var essai_derapage := ""
+var essai_bonus := ""
 var essai_trace := 0.0
+var musique := AudioStreamPlayer.new()
 
 
 func _ready() -> void:
 	get_window().title = R.TITRE
+	add_child(musique)
 	for option in OS.get_cmdline_user_args():
 		if option == "--simulation":
 			essai_circuit = 0
 		elif option.begins_with("--capture="):
 			capture = option.trim_prefix("--capture=")
+		elif option.begins_with("--essai-bonus="):
+			essai_bonus = option.trim_prefix("--essai-bonus=")
 		elif option.begins_with("--essai-derapage="):
 			essai_derapage = option.trim_prefix("--essai-derapage=")
+		elif option.begins_with("--galerie="):
+			_galerie(option.trim_prefix("--galerie="))
+			return
 		elif option.begins_with("--circuit="):
 			choix["circuit"] = int(option.trim_prefix("--circuit="))
 		elif option.begins_with("--joueurs="):
@@ -37,6 +45,12 @@ func _ready() -> void:
 		_simuler()
 	elif capture != "":
 		_lancer(true)
+	elif essai_bonus != "":
+		_lancer(false)
+		# Le joueur 1 roule tout droit, saute à 1 s, puis tire et utilise son objet sans arrêt.
+		course.scenario = func(t: float) -> Array:
+			var clic := int(t * 4.0) % 2 == 0
+			return [Vector2(0.0, 1.0), [false, t >= 1.0 and t < 1.2, t > 3.0 and clic, t > 3.0 and clic]]
 	elif essai_derapage != "":
 		_lancer(false)
 		# Le joueur 1 accélère, dérape à droite de 2 s à 3 s en contre-braquant, puis relâche.
@@ -46,7 +60,7 @@ func _ready() -> void:
 				volant = 1.0
 			elif t >= 2.1 and t < 3.0:
 				volant = -1.0
-			return [Vector2(volant, 1.0), t >= 2.0 and t < 3.0]
+			return [Vector2(volant, 1.0), [t >= 2.0 and t < 3.0, false, false, false]]
 	else:
 		_montrer_menu()
 
@@ -55,6 +69,7 @@ func _ready() -> void:
 
 func _montrer_menu() -> void:
 	_nettoyer()
+	_jouer(R.MUSIQUE_MENU)
 	menu = ColorRect.new()
 	menu.color = Color("#a6dcf5")
 	menu.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -87,8 +102,26 @@ func _montrer_menu() -> void:
 	colonne.add_child(demarrer)
 	demarrer.grab_focus()
 
-	var aide := "Joueur 1 : les flèches, Entrée pour déraper. Joueur 2 : Z Q S D, Espace pour déraper." if choix["joueurs"] == 2 else "Pour conduire : les flèches ou Z Q S D. Pour déraper : Espace en tournant."
-	_titre(colonne, aide, 18)
+	if choix["joueurs"] == 2:
+		_titre(colonne, "Joueur 1 : les flèches. J déraper, K sauter, L tirer un pépin, M utiliser l'objet.", 18)
+		_titre(colonne, "Joueur 2 : Z Q S D. Maj déraper, Espace sauter, F tirer un pépin, E utiliser l'objet.", 18)
+	else:
+		_titre(colonne, "Conduire : les flèches ou Z Q S D. Maj déraper, Espace sauter, F tirer un pépin, E utiliser l'objet.", 18)
+
+
+# Joue une musique en boucle (ou coupe le son si le fichier n'existe pas).
+func _jouer(chemin: String) -> void:
+	if R.VOLUME_MUSIQUE <= 0.0 or not ResourceLoader.exists(chemin):
+		musique.stop()
+		return
+	var morceau: AudioStream = load(chemin)
+	if musique.stream == morceau and musique.playing:
+		return
+	if "loop" in morceau:
+		morceau.loop = true
+	musique.stream = morceau
+	musique.volume_db = linear_to_db(R.VOLUME_MUSIQUE)
+	musique.play()
 
 
 func _titre(parent: Control, texte: String, taille: int) -> void:
@@ -161,9 +194,11 @@ func _lancer(demo: bool) -> void:
 	if choix["joueurs"] == 2 and humains[0] == humains[1]:
 		humains[1] = (humains[0] + 1) % Pilotes.PILOTES.size()  # pas deux fois le même fruit
 	course.demarrer(Circuits.CIRCUITS[choix["circuit"]], humains)
+	_jouer(Circuits.CIRCUITS[choix["circuit"]].get("musique", ""))
 
 
 func _montrer_resultats(classement: Array) -> void:
+	_jouer(R.MUSIQUE_ARRIVEE)
 	resultats = ColorRect.new()
 	resultats.color = Color(1, 1, 1, 0.85)
 	resultats.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -197,9 +232,19 @@ func _montrer_resultats(classement: Array) -> void:
 # ── Les essais automatiques ──────────────────────────────────
 
 func _process(_dt: float) -> void:
-	if capture != "" and essai_derapage == "" and course != null and course.temps > 4.0:
+	if capture != "" and essai_derapage == "" and essai_bonus == "" and course != null and course.temps > 4.0:
 		get_viewport().get_texture().get_image().save_png(capture)
 		get_tree().quit()
+	if essai_bonus != "" and course != null:
+		var kart = course.vues[0]["kart"]
+		if course.temps >= essai_trace:
+			essai_trace += 0.25
+			print("t=%.2f hauteur=%.2f pépins=%d objet=%s en vol=%d flaques=%d bouclier=%.1f turbo=%.1f vitesse=%.1f" % [course.temps, kart.ou_suis_je().y, kart.pepins, kart.objet, course.pepins.size(), course.flaques.size(), kart.bouclier, kart.turbo, kart.vitesse])
+		if course.temps > 1.3 and capture == "":
+			capture = "fait"
+			get_viewport().get_texture().get_image().save_png(essai_bonus)
+		if course.temps > 14.0:
+			get_tree().quit()
 	if essai_derapage != "" and course != null:
 		var kart = course.vues[0]["kart"]
 		if course.temps >= essai_trace:
@@ -210,6 +255,26 @@ func _process(_dt: float) -> void:
 			get_viewport().get_texture().get_image().save_png(essai_derapage)
 		if course.temps > 4.0:
 			get_tree().quit()
+
+
+# Photographie tous les pilotes côte à côte, vus de face, avec une cagette et une flaque.
+func _galerie(fichier: String) -> void:
+	var piste: Node3D = preload("res://jeu/piste.gd").new()
+	add_child(piste)
+	piste.construire(Circuits.CIRCUITS[0])
+	var depart: Transform3D = piste.repere(20.0)
+	for i in Pilotes.PILOTES.size():
+		var fruit: Node3D = preload("res://jeu/fruit.gd").creer(Pilotes.PILOTES[i])
+		fruit.transform = depart.translated_local(Vector3((i % 3 - 1) * 3.4, 0, -(i / 3) * 4.5)).rotated_local(Vector3.UP, PI + (i % 3 - 1) * 0.35)
+		add_child(fruit)
+	var camera := Camera3D.new()
+	camera.fov = 50.0
+	add_child(camera)
+	camera.global_position = depart * Vector3(0, 3.2, 8.5)
+	camera.look_at(depart * Vector3(0, 0.8, -2.0))
+	await get_tree().create_timer(1.0).timeout
+	get_viewport().get_texture().get_image().save_png(fichier)
+	get_tree().quit()
 
 
 # Fait courir les ordinateurs seuls sur chaque circuit et écrit le résultat.

@@ -14,6 +14,8 @@
 #    tours      le nombre de tours
 #    turbos     où poser les turbos : 0.0 = au départ, 0.5 = à la moitié du tour
 #    tremplins  pareil pour les tremplins (à mettre dans une ligne droite)
+#    bonus      pareil pour les rangées de cagettes à bonus
+#    musique    le fichier de musique du circuit, dans le dossier musique/
 #
 #  Conseils : garde au moins 30 mètres entre deux points, et ne monte pas
 #  de plus de 4 mètres d'un point au suivant.
@@ -27,6 +29,8 @@ const CIRCUITS := [
 		"largeur": 12.0,
 		"turbos": [0.04, 0.6],
 		"tremplins": [0.64],
+		"bonus": [0.15, 0.4, 0.85],
+		"musique": "res://musique/course-1.mp3",
 		"points": [
 			Vector3(0, 0, 0),
 			Vector3(60, 0, 0),
@@ -46,6 +50,8 @@ const CIRCUITS := [
 		"largeur": 12.0,
 		"turbos": [0.0, 0.62],
 		"tremplins": [],
+		"bonus": [0.12, 0.4, 0.8],
+		"musique": "res://musique/course-2.mp3",
 		"points": [
 			Vector3(-50, 0, 0),
 			Vector3(0, 0, 0),
