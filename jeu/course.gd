@@ -7,6 +7,7 @@ const Pilotes = preload("res://donnees/pilotes.gd")
 const Piste = preload("res://jeu/piste.gd")
 const Vehicules = preload("res://donnees/vehicules.gd")
 const Kart = preload("res://jeu/kart.gd")
+const Avion = preload("res://jeu/avion.gd")
 const R = preload("res://donnees/reglages.gd")
 
 const FLECHES := [KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT]
@@ -31,14 +32,17 @@ var demo := false   # true = l'ordinateur conduit aussi les karts des joueurs
 var scenario := Callable()  # pour les essais : remplace le clavier du joueur 1
 var pepins: Array = []   # les pépins en vol
 var flaques: Array = []  # les flaques de jus sur la route
+var aerien := false      # true = le mode Avions
 
 
 # humains : les numéros des pilotes des joueurs. vehicules : le numéro du véhicule de chacun.
 # tours : 0 = le nombre de tours écrit dans le circuit.
-func demarrer(circuit: Dictionary, humains: Array, vehicules: Array = [], tours := 0) -> void:
+# en_avion : true = le mode Avions.
+func demarrer(circuit: Dictionary, humains: Array, vehicules: Array = [], tours := 0, en_avion := false) -> void:
+	aerien = en_avion
 	piste = Piste.new()
 	add_child(piste)
-	piste.construire(circuit)
+	piste.construire(circuit, aerien)
 	if tours > 0:
 		piste.tours = tours
 
@@ -52,10 +56,13 @@ func demarrer(circuit: Dictionary, humains: Array, vehicules: Array = [], tours 
 	for j in humains.size():
 		grille.append([humains[j], true, Vehicules.VEHICULES[vehicules[j] if j < vehicules.size() else 0]])
 	for n in grille.size():
-		var kart := Kart.new()
+		var kart: Node3D = Avion.new() if aerien else Kart.new()
 		kart.preparer(Pilotes.PILOTES[grille[n][0]], piste, grille[n][1], grille[n][2])
 		add_child(kart)
-		kart.placer(-4.0 - (n >> 1) * 4.0, -2.5 if n % 2 == 0 else 2.5)
+		if aerien:
+			kart.placer(-5.0 - (n >> 1) * 8.0, -4.0 if n % 2 == 0 else 4.0)
+		else:
+			kart.placer(-4.0 - (n >> 1) * 4.0, -2.5 if n % 2 == 0 else 2.5)
 		kart.distance = kart.position_piste - piste.longueur
 		if demo:
 			kart.auto = true
@@ -97,6 +104,24 @@ func demarrer(circuit: Dictionary, humains: Array, vehicules: Array = [], tours 
 			"annonce": _texte(cellule, 54, HORIZONTAL_ALIGNMENT_CENTER, VERTICAL_ALIGNMENT_TOP),
 		})
 		vues[-1]["annonce"].offset_top = 80
+		if aerien:
+			# Le repère du prochain anneau : chaque joueur a le sien, que l'autre caméra ne montre pas.
+			var numero := vues.size() - 1
+			var tour_jaune := TorusMesh.new()
+			tour_jaune.inner_radius = piste.RAYON_ANNEAU + 0.5
+			tour_jaune.outer_radius = piste.RAYON_ANNEAU + 1.4
+			tour_jaune.rings = 32
+			var jaune := StandardMaterial3D.new()
+			jaune.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			jaune.albedo_color = Color(R.COULEUR_ANNEAUX[2])
+			var cible := MeshInstance3D.new()
+			cible.mesh = tour_jaune
+			cible.material_override = jaune
+			cible.layers = 1 << (10 + numero)
+			cible.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			add_child(cible)
+			vues[-1]["cible"] = cible
+			camera.cull_mask &= ~(1 << (11 - numero))
 	_cameras(1.0)
 
 
@@ -139,6 +164,9 @@ func _lire(joueur: int) -> Vector2:
 			gaz += 1.0
 		if Input.is_joy_button_pressed(joueur, JOY_BUTTON_B) or Input.get_joy_axis(joueur, JOY_AXIS_TRIGGER_LEFT) > 0.3:
 			gaz -= 1.0
+		# En avion, le stick sert aussi à monter et à descendre.
+		if aerien and absf(Input.get_joy_axis(joueur, JOY_AXIS_LEFT_Y)) > 0.2:
+			gaz -= Input.get_joy_axis(joueur, JOY_AXIS_LEFT_Y)
 	return Vector2(clampf(volant, -1.0, 1.0), clampf(gaz, -1.0, 1.0))
 
 
@@ -203,7 +231,7 @@ func _ramasser_les_cagettes() -> void:
 			cagette.visible = temps >= cagette.get_meta("retour", 0.0)
 			continue
 		for kart in karts:
-			if kart.ou_suis_je().distance_to(cagette.position) < 1.9:
+			if kart.ou_suis_je().distance_to(cagette.position) < (2.8 if aerien else 1.9):
 				cagette.visible = false
 				cagette.set_meta("retour", temps + R.CAGETTE_RETOUR)
 				kart.ramasser()
@@ -237,6 +265,9 @@ func _avancer_les_pepins(dt: float) -> void:
 		var fini: bool = p["vie"] <= 0.0
 		var choc := espace.intersect_ray(PhysicsRayQueryParameters3D.create(ici, la, 1))
 		var sol := espace.intersect_ray(PhysicsRayQueryParameters3D.create(la + Vector3.UP * 2.0, la + Vector3.DOWN * 6.0, 1))
+		if aerien:
+			choc = {}  # en l'air, le pépin file tout droit
+			sol = {}
 		for touche in [choc, sol]:
 			if not touche.is_empty() and touche["collider"].get_meta("sol", "") == "mur":
 				fini = true
@@ -246,7 +277,7 @@ func _avancer_les_pepins(dt: float) -> void:
 		for kart in karts:
 			var ecart: Vector3 = kart.ou_suis_je() - la
 			# Un kart qui saute assez haut laisse passer le pépin sous lui.
-			if kart != p["tireur"] and Vector2(ecart.x, ecart.z).length() < 1.7 and absf(ecart.y) < 0.9:
+			if kart != p["tireur"] and Vector2(ecart.x, ecart.z).length() < (2.4 if aerien else 1.7) and absf(ecart.y) < (2.0 if aerien else 0.9):
 				kart.recevoir_pepin()
 				fini = true
 				break
@@ -258,6 +289,9 @@ func _avancer_les_pepins(dt: float) -> void:
 # La flaque de jus est posée sur la route, juste derrière le kart, à la couleur du fruit.
 func _verser_du_jus(kart: Node3D) -> void:
 	var ou: Vector3 = kart.ou_suis_je() - kart.devant() * 2.8
+	if aerien:
+		_lacher_un_nuage_de_jus(kart)
+		return
 	var espace := piste.get_world_3d().direct_space_state
 	var sol := espace.intersect_ray(PhysicsRayQueryParameters3D.create(ou + Vector3.UP, ou + Vector3.DOWN * 4.0, 1))
 	if sol.is_empty():
@@ -277,6 +311,22 @@ func _verser_du_jus(kart: Node3D) -> void:
 	flaque.position = sol["position"] + sol["normal"] * 0.06
 	add_child(flaque)
 	flaques.append({"noeud": flaque, "fin": temps + R.JUS_DUREE, "auteur": kart})
+
+
+# Dans le mode Avions, le jus reste en l'air : c'est un nuage qui ralentit ceux qui le traversent.
+func _lacher_un_nuage_de_jus(kart: Node3D) -> void:
+	var forme := SphereMesh.new()
+	forme.radius = 3.0
+	forme.height = 6.0
+	var jus := StandardMaterial3D.new()
+	jus.albedo_color = Color(Color(kart.pilote["couleur"]), 0.6)
+	jus.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	var nuage := MeshInstance3D.new()
+	nuage.mesh = forme
+	nuage.material_override = jus
+	nuage.position = kart.ou_suis_je() - kart.devant() * 6.0
+	add_child(nuage)
+	flaques.append({"noeud": nuage, "fin": temps + R.JUS_DUREE, "auteur": kart})
 
 
 func _surveiller_les_flaques() -> void:
@@ -307,6 +357,12 @@ func _process(dt: float) -> void:
 		var kart = vue["kart"]
 		var place := ordre.find(kart) + 1
 		vue["tour"].text = "Tour %d / %d" % [clampi(kart.tour(), 1, piste.tours), piste.tours]
+		if aerien:
+			# Le prochain anneau de ce joueur est entouré de jaune (lui seul le voit).
+			var n: int = piste.anneaux.size()
+			vue["tour"].text += "     Anneau %d / %d" % [kart.prochain % n + 1, n]
+			var anneau: Dictionary = piste.anneaux[kart.prochain % n]
+			vue["cible"].global_transform = Transform3D(Basis(anneau["droite"], anneau["axe"], anneau["droite"].cross(anneau["axe"])) * (1.0 + 0.06 * sin(temps * 8.0)), anneau["centre"])
 		vue["place"].text = "1er" if place == 1 else "%de" % place
 		var message := ""
 		if temps < -3.0:

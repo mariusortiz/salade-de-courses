@@ -3,7 +3,7 @@
 extends RefCounted
 
 
-static func creer(pilote: Dictionary, vehicule: Dictionary = {}) -> Node3D:
+static func creer(pilote: Dictionary, vehicule: Dictionary = {}, en_avion := false) -> Node3D:
 	var chemin: String = pilote.get("modele", "")
 	if chemin != "":
 		if ResourceLoader.exists(chemin):
@@ -14,7 +14,10 @@ static func creer(pilote: Dictionary, vehicule: Dictionary = {}) -> Node3D:
 		push_warning("Modèle introuvable pour %s : %s. On garde les formes simples." % [pilote["nom"], chemin])
 
 	var kart := Node3D.new()
-	_kart(kart, Color(pilote["kart"]), vehicule.get("forme", "kart"))
+	if en_avion:
+		_avion(kart, Color(pilote["kart"]), vehicule.get("forme", "kart"))
+	else:
+		_kart(kart, Color(pilote["kart"]), vehicule.get("forme", "kart"))
 	_pilote(kart, pilote)
 	return kart
 
@@ -130,6 +133,92 @@ static func _kart(kart: Node3D, couleur: Color, forme: String) -> void:
 				directrices.append(pivot)
 	kart.set_meta("roues", tournantes)
 	kart.set_meta("directrices", directrices)
+
+
+# ── L'avion ──────────────────────────────────────────────────
+
+# Dans le mode Avions, chaque véhicule devient un avion :
+# kart = monoplan, buggy = biplan, bolide = jet, tracteur = coucou, cagette = planeur en bois.
+static func _avion(avion: Node3D, couleur: Color, forme: String) -> void:
+	var peinture := _matiere(couleur)
+	peinture.metallic = 0.3
+	peinture.roughness = 0.3
+	var sombre := _matiere(Color("#2b2f3a"))
+	var metal := _matiere(Color("#c3c9d4"))
+	metal.metallic = 0.9
+	metal.roughness = 0.25
+	var coque := _matiere(Color("#c58b4e")) if forme == "cagette" else peinture
+
+	# Le plancher, le siège et le manche.
+	_ajouter(avion, _boite(Vector3(1.15, 0.12, 2.6)), sombre, Vector3(0, 0.3, 0))
+	_ajouter(avion, _boite(Vector3(0.85, 0.8, 0.14)), sombre, Vector3(0, 0.78, 0.82)).rotation_degrees.x = -12
+	_membre(avion, Vector3(0, 0.55, -0.6), Vector3(0, 0.95, -0.25), 0.04, metal)
+	var cercle := TorusMesh.new()
+	cercle.inner_radius = 0.15
+	cercle.outer_radius = 0.22
+	_ajouter(avion, cercle, sombre, Vector3(0, 0.97, -0.22)).rotation.x = 0.72
+
+	# Le nez, les flancs, la queue et ses deux ailerons.
+	var nez := _ajouter(avion, _capsule(0.5, 2.3), coque, Vector3(0, 0.5, -1.0))
+	nez.rotation_degrees.x = 90
+	nez.scale = Vector3(1, 1, 0.8)
+	for x: float in [-0.62, 0.62]:
+		_ajouter(avion, _capsule(0.3, 2.3), coque, Vector3(x, 0.45, 0.2)).rotation_degrees.x = 90
+	_membre(avion, Vector3(0, 0.5, 0.9), Vector3(0, 0.8, 3.0), 0.28, coque)
+	_ajouter(avion, _boite(Vector3(0.08, 1.0, 0.7)), peinture, Vector3(0, 1.4, 2.9))
+	_ajouter(avion, _boite(Vector3(2.5, 0.07, 0.65)), peinture, Vector3(0, 0.85, 2.9))
+
+	# Les ailes, différentes pour chaque avion.
+	var helice := true
+	match forme:
+		"buggy":
+			# Le biplan : deux ailes l'une au-dessus de l'autre.
+			for y: float in [0.35, 2.9]:
+				_ajouter(avion, _boite(Vector3(6.6, 0.1, 1.2)), peinture, Vector3(0, y, -0.2))
+			for x: float in [-2.7, -0.75, 0.75, 2.7]:
+				_membre(avion, Vector3(x, 0.4, -0.2), Vector3(x, 2.85, -0.2), 0.05, metal)
+		"bolide":
+			# Le jet : des ailes en flèche, deux réacteurs, pas d'hélice.
+			helice = false
+			for cote: float in [-1.0, 1.0]:
+				_ajouter(avion, _boite(Vector3(3.6, 0.1, 1.3)), peinture, Vector3(cote * 2.2, 0.4, 0.5)).rotation.y = -cote * 0.45
+				_ajouter(avion, _capsule(0.3, 1.6), sombre, Vector3(cote * 1.7, 0.1, 0.5)).rotation_degrees.x = 90
+				var flamme := CylinderMesh.new()
+				flamme.top_radius = 0.22
+				flamme.bottom_radius = 0.0
+				flamme.height = 0.9
+				var feu := _matiere(Color("#ff9800"))
+				feu.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+				_ajouter(avion, flamme, feu, Vector3(cote * 1.7, 0.1, 1.7)).rotation_degrees.x = 90
+		"tracteur":
+			# Le coucou : une grosse aile au-dessus de la tête, et des roues.
+			_ajouter(avion, _boite(Vector3(6.0, 0.2, 1.7)), peinture, Vector3(0, 2.9, -0.2))
+			for x: float in [-0.9, 0.9]:
+				_membre(avion, Vector3(x * 0.7, 0.5, -0.5), Vector3(x * 1.6, 2.85, -0.4), 0.06, metal)
+				_membre(avion, Vector3(x * 0.7, 0.5, 0.6), Vector3(x * 1.6, 2.85, 0.1), 0.06, metal)
+				_membre(avion, Vector3(x * 0.6, 0.3, -0.6), Vector3(x, -0.3, -0.7), 0.06, metal)
+				_ajouter(avion, _roue(0.38, 0.25), _matiere(Color("#1c1c1f")), Vector3(x * 1.15, -0.35, -0.7)).rotation_degrees.z = 90
+		"cagette":
+			# Le planeur en bois : de très longues ailes fines, pas d'hélice.
+			helice = false
+			_ajouter(avion, _boite(Vector3(10.0, 0.08, 1.0)), coque, Vector3(0, 0.45, -0.1))
+			for x: float in [-4.9, 4.9]:
+				_ajouter(avion, _boite(Vector3(0.2, 0.1, 1.05)), peinture, Vector3(x, 0.47, -0.1))
+		_:
+			# Le monoplan : une seule aile.
+			_ajouter(avion, _boite(Vector3(7.6, 0.1, 1.35)), peinture, Vector3(0, 0.4, -0.1))
+			for x: float in [-3.6, 3.6]:
+				_ajouter(avion, _boite(Vector3(0.5, 0.12, 1.4)), sombre, Vector3(x, 0.4, -0.1))
+
+	# L'hélice tourne (voir avion.gd).
+	if helice:
+		var pivot := Node3D.new()
+		pivot.position = Vector3(0, 0.5, -2.25)
+		avion.add_child(pivot)
+		_ajouter(pivot, _boite(Vector3(0.16, 2.0, 0.05)), sombre, Vector3.ZERO)
+		_ajouter(pivot, _boite(Vector3(2.0, 0.16, 0.05)), sombre, Vector3.ZERO)
+		_ajouter(pivot, _boule(0.22), metal, Vector3.ZERO)
+		avion.set_meta("helices", [pivot])
 
 
 static func _roue(rayon: float, epaisseur: float) -> CylinderMesh:

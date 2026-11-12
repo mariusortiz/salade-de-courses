@@ -80,7 +80,11 @@ func preparer(le_pilote: Dictionary, la_piste: Node3D, est_humain: bool, vehicul
 	acceleration = 12.0 + (pilote["acceleration"] + vehicule.get("acceleration", 0)) * 4.0
 	braquage = 1.5 + (pilote["maniabilite"] + vehicule.get("maniabilite", 0)) * 0.25
 	cote = randf_range(-0.3, 0.3) * piste.largeur
+	_fabriquer(vehicule)
 
+
+# Fabrique le corps du kart (la boule qui roule) et son apparence.
+func _fabriquer(vehicule: Dictionary) -> void:
 	boule = RigidBody3D.new()
 	var forme := CollisionShape3D.new()
 	var sphere := SphereShape3D.new()
@@ -102,19 +106,7 @@ func preparer(le_pilote: Dictionary, la_piste: Node3D, est_humain: bool, vehicul
 	visuel.add_child(modele)
 	add_child(visuel)
 
-	# La bulle du bouclier.
-	var savon := StandardMaterial3D.new()
-	savon.albedo_color = Color(0.5, 0.9, 1.0, 0.35)
-	savon.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	var sphere_bulle := SphereMesh.new()
-	sphere_bulle.radius = 1.9
-	sphere_bulle.height = 3.8
-	bulle = MeshInstance3D.new()
-	bulle.mesh = sphere_bulle
-	bulle.material_override = savon
-	bulle.position = Vector3(0, 1.0, 0)
-	bulle.visible = false
-	visuel.add_child(bulle)
+	_creer_la_bulle()
 
 	# Les étincelles du dérapage, sous les roues arrière.
 	lueur.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -129,6 +121,22 @@ func preparer(le_pilote: Dictionary, la_piste: Node3D, est_humain: bool, vehicul
 		m.visible = false
 		visuel.add_child(m)
 		etincelles.append(m)
+
+
+# La bulle du bouclier.
+func _creer_la_bulle() -> void:
+	var savon := StandardMaterial3D.new()
+	savon.albedo_color = Color(0.5, 0.9, 1.0, 0.35)
+	savon.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	var sphere_bulle := SphereMesh.new()
+	sphere_bulle.radius = 1.9
+	sphere_bulle.height = 3.8
+	bulle = MeshInstance3D.new()
+	bulle.mesh = sphere_bulle
+	bulle.material_override = savon
+	bulle.position = Vector3(0, 1.0, 0)
+	bulle.visible = false
+	visuel.add_child(bulle)
 
 
 # Pose le kart sur la piste, à une distance du départ et décalé sur le côté.
@@ -229,7 +237,39 @@ func _bonus_de_l_ordi(dt: float) -> void:
 				break
 
 
+# Les bonus et les ennuis : le bouclier, le jus, le tête-à-queue, les boutons pour tirer
+# et pour utiliser l'objet. Répond true pendant un tête-à-queue.
+func _gerer_les_bonus(dt: float) -> bool:
+	bouclier = maxf(0.0, bouclier - dt)
+	englue = maxf(0.0, englue - dt)
+	annonce_temps = maxf(0.0, annonce_temps - dt)
+	repos_saut = maxf(0.0, repos_saut - dt)
+	var en_toupie := toupie > 0.0
+	toupie = maxf(0.0, toupie - dt)
+	if en_toupie:
+		pass
+	elif actif and auto:
+		_bonus_de_l_ordi(dt)
+	elif actif:
+		if bouton_tir and not tir_avant:
+			_tirer()
+		if bouton_objet and not objet_avant:
+			_utiliser_objet()
+	tir_avant = bouton_tir
+	objet_avant = bouton_objet
+	return en_toupie
+
+
 func _physics_process(dt: float) -> void:
+	_avancer(dt)
+
+
+func _process(dt: float) -> void:
+	_dessiner(dt)
+
+
+# La conduite, soixante fois par seconde.
+func _avancer(dt: float) -> void:
 	var ici := boule.global_position
 
 	# Qu'y a-t-il sous les roues ?
@@ -250,25 +290,10 @@ func _physics_process(dt: float) -> void:
 		volant = ordre.x
 		gaz = ordre.y
 
-	# Les bonus et les ennuis.
-	bouclier = maxf(0.0, bouclier - dt)
-	englue = maxf(0.0, englue - dt)
-	annonce_temps = maxf(0.0, annonce_temps - dt)
-	repos_saut = maxf(0.0, repos_saut - dt)
-	var en_toupie := toupie > 0.0
-	toupie = maxf(0.0, toupie - dt)
+	var en_toupie := _gerer_les_bonus(dt)
 	if en_toupie:
 		volant = 0.0
 		gaz = 0.0
-	elif actif and auto:
-		_bonus_de_l_ordi(dt)
-	elif actif:
-		if bouton_tir and not tir_avant:
-			_tirer()
-		if bouton_objet and not objet_avant:
-			_utiliser_objet()
-	tir_avant = bouton_tir
-	objet_avant = bouton_objet
 
 	# Le saut : seulement quand on touche le sol.
 	var saute := actif and not auto and bouton_saut and au_sol and repos_saut <= 0.0 and not en_toupie
@@ -364,7 +389,7 @@ func _physics_process(dt: float) -> void:
 	hauteur_max = maxf(hauteur_max, ici.y - piste.courbe.sample_baked(position_piste).y)
 
 
-func _process(dt: float) -> void:
+func _dessiner(dt: float) -> void:
 	# Le fruit suit la boule, tourné dans la direction du kart et incliné comme le sol.
 	var direction := Vector3(-sin(cap), 0, -cos(cap))
 	var avant := (direction - normale * direction.dot(normale)).normalized()

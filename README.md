@@ -28,6 +28,17 @@ Pour modifier le jeu, il faut Godot :
   Les pépins se tirent tout de suite ; le turbo, le bouclier et le jus se gardent en réserve.
 - Sauter permet de passer au-dessus d'une flaque de jus ou d'un pépin.
 
+### Le mode Avions
+
+Dans le menu, « Mode : Avions » transforme chaque véhicule en avion. La course se fait dans les airs,
+au-dessus du même circuit : il faut traverser les anneaux dans l'ordre. Le prochain est entouré de jaune.
+Un anneau orange donne un turbo, et certains portent des cagettes à bonus.
+
+- L'avion avance tout seul. Gauche et droite pour tourner, haut pour monter, bas pour descendre.
+- Le bouton du dérapage sert de frein. Tirer un pépin et utiliser l'objet marchent comme en kart
+  (le jus devient un nuage qui ralentit ceux qui le traversent).
+- Si on passe à côté d'un anneau, on est reposé juste devant lui.
+
 Si le kart sort de la piste, il y est reposé au bout de deux secondes.
 
 ## Modifier le jeu
@@ -46,6 +57,7 @@ Le reste du code est dans `jeu/` :
 - `piste.gd` construit la route, les barrières, les cagettes et le décor à partir des points du circuit, et dessine les textures ;
 - `kart.gd` gère la conduite (une boule qui roule sur la piste, avec le fruit posé dessus) ;
 - `decor.gd` contient les décors (campagne, espace, montagne, grotte, pizza, aquarium, frigo, potager) : leurs couleurs, leur lumière, et les objets posés autour de la route ;
+- `avion.gd` gère le vol dans le mode Avions (c'est un kart qui vole : il garde les bonus du kart) ;
 - `fruit.gd` dessine le fruit (avec ses bras et ses jambes) et son véhicule ;
 - `course.gd` gère le départ, les touches, les bonus, les écrans des joueurs et le classement ;
 - `main.gd` gère le menu et la musique.
@@ -90,6 +102,7 @@ godot --headless --path . --fixed-fps 60 -- --simulation
 Chaque kart doit arriver. « Retours en piste » compte les fois où un kart est sorti de la route.
 
 Pour voir tous les pilotes de face dans une image : `godot --path . -- --galerie=/chemin/image.png`.
+Ajouter `--avions` juste après `--` pour faire la même chose dans le mode Avions.
 
 ## Mettre en ligne
 

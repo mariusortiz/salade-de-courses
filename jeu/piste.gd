@@ -15,6 +15,9 @@ var longueur := 0.0
 var largeur := 12.0
 var tours := 3
 var turbos: Array = []    # positions des turbos, en mètres depuis le départ
+const RAYON_ANNEAU := 6.0
+
+var anneaux: Array = []   # les anneaux du mode Avions, dans l'ordre
 var cagettes: Array = []  # les cagettes à bonus posées sur la route
 var jalons: Array[Vector3] = []  # un point de la route tous les 4 mètres, pour placer le décor
 var zone := Rect2()
@@ -23,7 +26,8 @@ var ambiance: Dictionary  # les couleurs et les réglages du décor (voir decor.
 var animes: Array = []    # les objets du décor qui bougent : poissons, bulles, astéroïdes
 
 
-func construire(def: Dictionary) -> void:
+# aerien : true = le mode Avions, avec des anneaux à traverser au-dessus de la route.
+func construire(def: Dictionary, aerien := false) -> void:
 	largeur = def.get("largeur", 12.0)
 	tours = def.get("tours", 3)
 	var decor: String = def.get("decor", "campagne")
@@ -61,8 +65,11 @@ func construire(def: Dictionary) -> void:
 		_turbo(float(part) * longueur)
 	for part in def.get("tremplins", []):
 		_tremplin(float(part) * longueur)
-	for part in def.get("bonus", []):
-		_rangee_de_cagettes(float(part) * longueur)
+	if aerien:
+		_anneaux(def)
+	else:
+		for part in def.get("bonus", []):
+			_rangee_de_cagettes(float(part) * longueur)
 	if ambiance["tribunes"]:
 		_tribunes()
 	Decor.new().planter(self, decor)
@@ -368,18 +375,50 @@ func _tremplin(distance: float) -> void:
 # si un kart en touche une.
 func _rangee_de_cagettes(distance: float) -> void:
 	var r := repere(distance)
+	for i in 4:
+		_cagette(r.origin + r.basis.x * (i - 1.5) * largeur / 5.0 + r.basis.y * 1.0)
+
+
+func _cagette(ou: Vector3) -> void:
 	var caisse := BoxMesh.new()
 	caisse.size = Vector3.ONE * 1.1
-	var bois := _matiere_texture("bois", "bois", [])
-	for i in 4:
-		var cagette := Node3D.new()
-		cagette.position = r.origin + r.basis.x * (i - 1.5) * largeur / 5.0 + r.basis.y * 1.0
-		add_child(cagette)
-		_objet(caisse, bois, Vector3.ZERO, Vector3.ONE, cagette)
-		for j in 4:
-			var fruit := _matiere(FRUITS[(i + j) % FRUITS.size()])
-			_objet(_boule(0.3), fruit, Vector3((j % 2 - 0.5) * 0.5, 0.6, (j >> 1) * 0.5 - 0.25), Vector3.ONE, cagette)
-		cagettes.append(cagette)
+	var cagette := Node3D.new()
+	cagette.position = ou
+	add_child(cagette)
+	_objet(caisse, _matiere_texture("bois", "bois", []), Vector3.ZERO, Vector3.ONE, cagette)
+	for j in 4:
+		var fruit := _matiere(FRUITS[(cagettes.size() + j) % FRUITS.size()])
+		_objet(_boule(0.3), fruit, Vector3((j % 2 - 0.5) * 0.5, 0.6, (j >> 1) * 0.5 - 0.25), Vector3.ONE, cagette)
+	cagettes.append(cagette)
+
+
+# Les anneaux du mode Avions suivent la route, en montant, en descendant et en se décalant.
+# Ceux qui sont à la place d'un turbo donnent un turbo, ceux à la place d'un bonus portent des cagettes.
+func _anneaux(def: Dictionary) -> void:
+	var nombre := maxi(6, int(round(longueur / R.ANNEAUX_ECART)))
+	var speciaux := {}  # numéro de l'anneau → "turbo" ou "bonus"
+	for sorte in ["bonus", "turbos"]:
+		for part in def.get(sorte, []):
+			speciaux[int(round((float(part) * longueur - 25.0) / longueur * nombre)) % nombre] = sorte
+	var cercle := TorusMesh.new()
+	cercle.inner_radius = RAYON_ANNEAU - 0.4
+	cercle.outer_radius = RAYON_ANNEAU + 0.4
+	cercle.rings = 32
+	for k in nombre:
+		var d := 25.0 + k * longueur / nombre
+		var r := repere(d)
+		var centre := r.origin + Vector3.UP * (10.0 + 5.0 * sin(k * 1.7)) + r.basis.x * 4.0 * sin(k * 2.3)
+		var turbo: bool = speciaux.get(k, "") == "turbos"
+		var matiere := StandardMaterial3D.new()
+		matiere.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		matiere.albedo_color = Color(R.COULEUR_ANNEAUX[1 if turbo else 0])
+		var m := _objet(cercle, matiere, centre)
+		m.basis = Basis(r.basis.x, -r.basis.z, r.basis.y)  # debout, face à la route
+		m.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		anneaux.append({"centre": centre, "axe": -r.basis.z, "droite": r.basis.x, "distance": d, "turbo": turbo})
+		if speciaux.get(k, "") == "bonus":
+			for i in 3:
+				_cagette(centre + r.basis.x * (i - 1) * 3.0)
 
 
 # ── Le décor ─────────────────────────────────────────────────

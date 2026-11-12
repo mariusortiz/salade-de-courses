@@ -22,6 +22,12 @@ const DERAPAGE_PETIT_TURBO := 0.8   # secondes de dérapage pour gagner un petit
 const DERAPAGE_GRAND_TURBO := 1.8   # secondes de dérapage pour gagner un grand turbo
 const COULEUR_ETINCELLES := ["#ffffff", "#ffd54f", "#ff4081"]  # au début, petit turbo, grand turbo
 
+# Le mode Avions
+const AVION_MANCHE := 1.8     # la vitesse à laquelle l'avion lève ou baisse le nez
+const AVION_PLAFOND := 32.0   # la hauteur maximum au-dessus de la route
+const ANNEAUX_ECART := 40.0   # la distance entre deux anneaux, à peu près
+const COULEUR_ANNEAUX := ["#ffffff", "#ffb300", "#ffee58"]  # normal, turbo, le prochain à traverser
+
 # Le saut
 const SAUT_FORCE := 6.5       # plus grand = on saute plus haut (au-dessus de 7, on passe par-dessus les barrières)
 

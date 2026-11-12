@@ -9,7 +9,7 @@ const Course = preload("res://jeu/course.gd")
 
 const ENCRE := Color("#1d2433")
 
-var choix := {"joueurs": 1, "pilotes": [0, 1], "vehicules": [0, 0], "circuit": 0, "tours": 3}
+var choix := {"joueurs": 1, "pilotes": [0, 1], "vehicules": [0, 0], "circuit": 0, "tours": 3, "avions": false}
 var menu: Control
 var resultats: Control
 var course: Node
@@ -44,6 +44,8 @@ func _ready() -> void:
 		elif option.begins_with("--galerie="):
 			_galerie(option.trim_prefix("--galerie="))
 			return
+		elif option == "--avions":
+			choix["avions"] = true
 		elif option.begins_with("--vehicule="):
 			choix["vehicules"] = [int(option.trim_prefix("--vehicule=")), int(option.trim_prefix("--vehicule="))]
 		elif option.begins_with("--circuit="):
@@ -102,6 +104,9 @@ func _montrer_menu() -> void:
 	_titre(ligne, "      Tours", 20)
 	_boutons(ligne, R.CHOIX_DE_TOURS.map(func(t): return str(t)), R.CHOIX_DE_TOURS.find(choix["tours"]), func(i): choix["tours"] = R.CHOIX_DE_TOURS[i])
 
+	_titre(ligne, "      Mode", 20)
+	_boutons(ligne, ["Karts", "Avions"], 1 if choix["avions"] else 0, func(i): choix["avions"] = i == 1)
+
 	# Chaque joueur choisit son pilote et son véhicule. À deux, les joueurs sont côte à côte.
 	var noms: Array = Pilotes.PILOTES.map(func(p): return p["nom"])
 	var couleurs: Array = Pilotes.PILOTES.map(func(p): return Color(p["couleur"]))
@@ -116,8 +121,8 @@ func _montrer_menu() -> void:
 		joueurs.add_child(bloc)
 		_titre(bloc, "Joueur %d : pilote" % (j + 1) if choix["joueurs"] == 2 else "Pilote", 20)
 		_rangee(bloc, noms, choix["pilotes"][j], func(i): choix["pilotes"][j] = i, couleurs, largeur)
-		_titre(bloc, "Véhicule", 20)
-		_rangee(bloc, Vehicules.VEHICULES.map(func(v): return v["nom"]), choix["vehicules"][j], func(i): choix["vehicules"][j] = i, [], largeur)
+		_titre(bloc, "Avion" if choix["avions"] else "Véhicule", 20)
+		_rangee(bloc, Vehicules.VEHICULES.map(func(v): return v["avion"] if choix["avions"] else v["nom"]), choix["vehicules"][j], func(i): choix["vehicules"][j] = i, [], largeur)
 
 	_titre(colonne, "Circuit", 20)
 	_rangee(colonne, Circuits.CIRCUITS.map(func(c): return c["nom"]), choix["circuit"], func(i): choix["circuit"] = i)
@@ -130,7 +135,13 @@ func _montrer_menu() -> void:
 	colonne.add_child(demarrer)
 	demarrer.grab_focus()
 
-	if choix["joueurs"] == 2:
+	if choix["avions"]:
+		_titre(colonne, "Traverse les anneaux dans l'ordre : le prochain est entouré de jaune. L'avion avance tout seul.", 18)
+		if choix["joueurs"] == 2:
+			_titre(colonne, "Joueur 1 : les flèches (haut = monter). J freiner, L tirer, M objet.     Joueur 2 : Z Q S D. Maj freiner, F tirer, E objet.", 18)
+		else:
+			_titre(colonne, "Les flèches ou Z Q S D : tourner, monter (haut), descendre (bas). Maj freiner, F tirer un pépin, E utiliser l'objet.", 18)
+	elif choix["joueurs"] == 2:
 		_titre(colonne, "Joueur 1 : les flèches. J déraper, K sauter, L tirer un pépin, M utiliser l'objet.", 18)
 		_titre(colonne, "Joueur 2 : Z Q S D. Maj déraper, Espace sauter, F tirer un pépin, E utiliser l'objet.", 18)
 	else:
@@ -229,7 +240,7 @@ func _lancer(demo: bool) -> void:
 	var humains: Array = choix["pilotes"].slice(0, choix["joueurs"])
 	if choix["joueurs"] == 2 and humains[0] == humains[1]:
 		humains[1] = (humains[0] + 1) % Pilotes.PILOTES.size()  # pas deux fois le même fruit
-	course.demarrer(Circuits.CIRCUITS[choix["circuit"]], humains, choix["vehicules"], choix["tours"])
+	course.demarrer(Circuits.CIRCUITS[choix["circuit"]], humains, choix["vehicules"], choix["tours"], choix["avions"])
 	_jouer(Circuits.CIRCUITS[choix["circuit"]].get("musique", ""))
 
 
@@ -300,7 +311,7 @@ func _galerie(fichier: String) -> void:
 	piste.construire(Circuits.CIRCUITS[0])
 	var depart: Transform3D = piste.repere(20.0)
 	for i in Pilotes.PILOTES.size():
-		var fruit: Node3D = preload("res://jeu/fruit.gd").creer(Pilotes.PILOTES[i], Vehicules.VEHICULES[i % Vehicules.VEHICULES.size()])
+		var fruit: Node3D = preload("res://jeu/fruit.gd").creer(Pilotes.PILOTES[i], Vehicules.VEHICULES[i % Vehicules.VEHICULES.size()], choix["avions"])
 		fruit.transform = depart.translated_local(Vector3((i % 4 - 1.5) * 3.3, 0, -(i / 4) * 5.0)).rotated_local(Vector3.UP, PI + (i % 4 - 1.5) * 0.3)
 		add_child(fruit)
 	var camera := Camera3D.new()
@@ -321,7 +332,7 @@ func _simuler() -> void:
 		return
 	course = Course.new()
 	add_child(course)
-	course.demarrer(Circuits.CIRCUITS[essai_circuit], [])
+	course.demarrer(Circuits.CIRCUITS[essai_circuit], [], [], 0, choix["avions"])
 	print("%s : %.0f m par tour, %d tours" % [Circuits.CIRCUITS[essai_circuit]["nom"], course.piste.longueur, course.piste.tours])
 	course.finie.connect(func(classement: Array):
 		for r in classement:
