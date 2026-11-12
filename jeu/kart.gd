@@ -90,7 +90,7 @@ func preparer(le_pilote: Dictionary, la_piste: Node3D, est_humain: bool) -> void
 	glisse.friction = 0.0
 	glisse.bounce = 0.0
 	boule.physics_material_override = glisse
-	boule.gravity_scale = R.GRAVITE
+	boule.gravity_scale = R.GRAVITE * piste.ambiance["gravite"]
 	boule.collision_layer = 2    # les karts
 	boule.collision_mask = 1 | 2 # se cognent au décor et entre eux
 	boule.continuous_cd = true
@@ -320,7 +320,7 @@ func _physics_process(dt: float) -> void:
 		if en_toupie:
 			limite *= 0.2
 		if saute:
-			v_haut = maxf(v_haut, 0.0) + R.SAUT_FORCE
+			v_haut = maxf(v_haut, 0.0) + R.SAUT_FORCE * sqrt(piste.ambiance["gravite"])
 		if turbo > 0.0:
 			limite *= R.TURBO_FORCE
 			gaz = 1.0
@@ -334,7 +334,7 @@ func _physics_process(dt: float) -> void:
 		if v_avant > limite:
 			v_avant = maxf(limite, v_avant - (60.0 if en_toupie else 30.0) * dt)
 
-		v_cote *= exp(-R.ADHERENCE * (R.DERAPAGE_GLISSE if derapage != 0.0 else 1.0) * dt)
+		v_cote *= exp(-R.ADHERENCE * piste.ambiance["adherence"] * (R.DERAPAGE_GLISSE if derapage != 0.0 else 1.0) * dt)
 		boule.linear_velocity = avant * v_avant + v_cote + normale * v_haut
 		vitesse = v_avant
 

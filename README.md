@@ -44,9 +44,17 @@ Le reste du code est dans `jeu/` :
 
 - `piste.gd` construit la route, les barrières, les cagettes et le décor à partir des points du circuit, et dessine les textures ;
 - `kart.gd` gère la conduite (une boule qui roule sur la piste, avec le fruit posé dessus) ;
+- `decor.gd` contient les décors (campagne, espace, montagne, grotte, pizza, aquarium, frigo, potager) : leurs couleurs, leur lumière, et les objets posés autour de la route ;
 - `fruit.gd` dessine le fruit (avec ses bras et ses jambes) et son kart ;
 - `course.gd` gère le départ, les touches, les bonus, les écrans des joueurs et le classement ;
 - `main.gd` gère le menu et la musique.
+
+## Ajouter un circuit ou un décor
+
+Pour un nouveau circuit, copier un circuit dans `donnees/circuits.gd`, changer son nom et ses points,
+et choisir son `decor`. Pour un nouveau décor, ouvrir `jeu/decor.gd` : ajouter une ambiance dans
+`AMBIANCES` (les couleurs, la lumière, la gravité, l'adhérence) et une fonction du même nom qui pose
+les objets. Le plus simple est de copier un décor existant et de le transformer.
 
 ## Utiliser des modèles 3D
 

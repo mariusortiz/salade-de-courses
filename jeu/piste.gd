@@ -1,8 +1,10 @@
 # Construit un circuit en 3D à partir de sa liste de points (donnees/circuits.gd) :
-# la route, les barrières, les turbos, les tremplins, les cagettes à bonus et le décor.
+# la route, les barrières, les turbos, les tremplins et les cagettes à bonus.
+# Le décor autour est posé par decor.gd.
 extends Node3D
 
 const R = preload("res://donnees/reglages.gd")
+const Decor = preload("res://jeu/decor.gd")
 
 const FRUITS := ["#e53935", "#fb8c00", "#fdd835", "#8e24aa", "#d81b60", "#7cb342"]
 
@@ -17,11 +19,15 @@ var cagettes: Array = []  # les cagettes à bonus posées sur la route
 var jalons: Array[Vector3] = []  # un point de la route tous les 4 mètres, pour placer le décor
 var zone := Rect2()
 var hasard := RandomNumberGenerator.new()
+var ambiance: Dictionary  # les couleurs et les réglages du décor (voir decor.gd)
+var animes: Array = []    # les objets du décor qui bougent : poissons, bulles, astéroïdes
 
 
 func construire(def: Dictionary) -> void:
 	largeur = def.get("largeur", 12.0)
 	tours = def.get("tours", 3)
+	var decor: String = def.get("decor", "campagne")
+	ambiance = Decor.ambiance(decor)
 	hasard.seed = 7  # toujours le même décor aux mêmes endroits
 
 	# La courbe passe par tous les points, en arrondissant les virages.
@@ -57,17 +63,24 @@ func construire(def: Dictionary) -> void:
 		_tremplin(float(part) * longueur)
 	for part in def.get("bonus", []):
 		_rangee_de_cagettes(float(part) * longueur)
-	_tribunes()
-	_arbres()
-	_rochers_et_buissons()
-	_fleurs()
-	_bottes_de_paille()
-	_lointain()
+	if ambiance["tribunes"]:
+		_tribunes()
+	Decor.new().planter(self, decor)
 
 
 func _process(dt: float) -> void:
 	for c in cagettes:
 		c.rotate_y(dt * 1.5)
+	for a in animes:
+		var noeud: Node3D = a["noeud"]
+		if a.has("monte"):
+			# Une bulle monte, puis repart du sol.
+			noeud.position.y = fposmod(noeud.position.y + a["monte"] * dt, a["plafond"])
+		else:
+			# Un poisson ou un astéroïde tourne en rond.
+			a["angle"] += a["vitesse"] * dt
+			noeud.position = a["centre"] + Vector3(cos(a["angle"]), 0.08 * sin(a["angle"] * 3.0), sin(a["angle"])) * a["rayon"]
+			noeud.rotation.y = -a["angle"]
 
 
 # Donne la position et l'orientation de la route à une distance du départ.
@@ -105,11 +118,14 @@ func _route() -> void:
 		var bg := b.origin - b.basis.x * demi
 		var bd := b.origin + b.basis.x * demi
 		# La texture de la route se répète tous les 8 mètres.
-		_carre(route, ag, bg, bd, ad, a.basis.y, Color.WHITE,
+		var lueur := Color.WHITE
+		if ambiance["arc_en_ciel"]:
+			lueur = Color.from_hsv(fposmod(da / longueur * 3.0, 1.0), 0.45, 1.0)
+		_carre(route, ag, bg, bd, ad, a.basis.y, lueur,
 			Vector2(0, da / 8.0), Vector2(0, db / 8.0), Vector2(1, db / 8.0), Vector2(1, da / 8.0))
 
 		# Les barrières ont une épaisseur, et la route repose sur une dalle en béton.
-		var rouge_blanc := Color(R.COULEUR_BARRIERES[(i >> 1) & 1])
+		var rouge_blanc := Color(ambiance["barrieres"][(i >> 1) & 1]) * lueur
 		for cote: float in [-1.0, 1.0]:
 			var pa := a.origin + a.basis.x * demi * cote
 			var pb := b.origin + b.basis.x * demi * cote
@@ -121,7 +137,8 @@ func _route() -> void:
 			_carre(murs, oa, ob, ob + dalle, oa + dalle, a.basis.x * cote, beton)
 
 	var bitume := StandardMaterial3D.new()
-	bitume.albedo_texture = _texture("route")
+	bitume.albedo_texture = _texture("route-" + str(ambiance["route"]), "route", ambiance["route"] + ambiance["lignes"], 0.3)
+	bitume.vertex_color_use_as_albedo = true
 	bitume.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 	bitume.cull_mode = BaseMaterial3D.CULL_DISABLED
 	bitume.roughness = 0.9
@@ -166,6 +183,8 @@ func _solide(forme: Shape3D, ou: Transform3D, sol: String) -> void:
 
 # Des piliers sous la route quand elle est en hauteur (sauf au-dessus d'une autre route).
 func _piliers() -> void:
+	if ambiance["sol"].is_empty():
+		return  # pas de sol, pas de piliers
 	var pilier := CylinderMesh.new()
 	pilier.top_radius = 0.9
 	pilier.bottom_radius = 1.1
@@ -229,46 +248,51 @@ func _matiere(couleur: String) -> StandardMaterial3D:
 
 
 # Les textures sont dessinées par le jeu lui-même, point par point.
-func _texture(nom: String) -> ImageTexture:
-	if textures.has(nom):
-		return textures[nom]
+#   cle       un nom pour retrouver la texture (elle n'est dessinée qu'une fois)
+#   sorte     "bruit" (deux couleurs mélangées), "route", "bois" ou "damier"
+#   couleurs  les couleurs à utiliser
+#   grain     petit = grandes taches, grand = petits grains
+func _texture(cle: String, sorte: String, couleurs: Array, grain := 0.1) -> ImageTexture:
+	if textures.has(cle):
+		return textures[cle]
 	var cote := 128
 	var bruit := FastNoiseLite.new()
-	bruit.seed = nom.hash()
-	bruit.frequency = 0.05 if nom == "herbe" else 0.3
-	var grain: Image = bruit.get_seamless_image(cote, cote)
+	bruit.seed = cle.hash()
+	bruit.frequency = grain
+	var taches: Image = bruit.get_seamless_image(cote, cote)
+	var teintes: Array = couleurs.map(func(c): return Color(c))
 	var image := Image.create(cote, cote, false, Image.FORMAT_RGB8)
 	for y in cote:
 		for x in cote:
-			var g := grain.get_pixel(x, y).r
+			var g := taches.get_pixel(x, y).r
 			var couleur := Color.WHITE
-			match nom:
-				"herbe":
-					couleur = Color(R.COULEUR_HERBE).darkened(0.18).lerp(Color(R.COULEUR_HERBE).lightened(0.12), g)
-					if (x * 7 + y * 13) % 29 == 0:
-						couleur = couleur.lightened(0.15)  # des brins d'herbe plus clairs
+			match sorte:
 				"route":
 					# Deux bandes de bitume, les lignes des bords et les pointillés du milieu.
-					couleur = Color(R.COULEUR_ROUTE[y >> 6]).darkened(0.25 * g)
+					couleur = teintes[y >> 6].darkened(0.25 * g)
 					if (x >= 4 and x < 8) or (x >= 120 and x < 124):
-						couleur = Color(R.COULEUR_LIGNES[0])
+						couleur = teintes[2]
 					elif x >= 62 and x < 66 and y < 64:
-						couleur = Color(R.COULEUR_LIGNES[1])
+						couleur = teintes[3]
 				"bois":
 					couleur = Color("#c58b4e").darkened(0.2 * g)
 					if y % 32 < 3 or x < 3 or x > 124:
 						couleur = Color("#6d4423")  # les fentes entre les planches
-				"paille":
-					couleur = Color("#e8c35a").darkened(0.3 * g)
+				"damier":
+					couleur = teintes[((x >> 6) + (y >> 6)) % 2]
+				_:
+					couleur = teintes[0].lerp(teintes[1], g)
+					if (x * 7 + y * 13) % 29 == 0:
+						couleur = couleur.lightened(0.12)  # des petits points plus clairs
 			image.set_pixel(x, y, couleur)
 	image.generate_mipmaps()
-	textures[nom] = ImageTexture.create_from_image(image)
-	return textures[nom]
+	textures[cle] = ImageTexture.create_from_image(image)
+	return textures[cle]
 
 
-func _matiere_texture(nom: String, repetition := Vector3.ONE) -> StandardMaterial3D:
+func _matiere_texture(cle: String, sorte: String, couleurs: Array, grain := 0.1, repetition := Vector3.ONE) -> StandardMaterial3D:
 	var matiere := StandardMaterial3D.new()
-	matiere.albedo_texture = _texture(nom)
+	matiere.albedo_texture = _texture(cle, sorte, couleurs, grain)
 	matiere.uv1_scale = repetition
 	matiere.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 	return matiere
@@ -346,7 +370,7 @@ func _rangee_de_cagettes(distance: float) -> void:
 	var r := repere(distance)
 	var caisse := BoxMesh.new()
 	caisse.size = Vector3.ONE * 1.1
-	var bois := _matiere_texture("bois")
+	var bois := _matiere_texture("bois", "bois", [])
 	for i in 4:
 		var cagette := Node3D.new()
 		cagette.position = r.origin + r.basis.x * (i - 1.5) * largeur / 5.0 + r.basis.y * 1.0
@@ -363,126 +387,49 @@ func _rangee_de_cagettes(distance: float) -> void:
 func _ciel_et_lumiere() -> void:
 	var ciel := Sky.new()
 	var bleu := ProceduralSkyMaterial.new()
-	bleu.sky_top_color = Color(R.COULEUR_CIEL[0])
-	bleu.sky_horizon_color = Color(R.COULEUR_CIEL[1])
-	bleu.ground_horizon_color = Color(R.COULEUR_CIEL[1])
-	bleu.ground_bottom_color = Color(R.COULEUR_HERBE)
+	bleu.sky_top_color = Color(ambiance["ciel"][0])
+	bleu.sky_horizon_color = Color(ambiance["ciel"][1])
+	bleu.ground_horizon_color = Color(ambiance["ciel"][1])
+	bleu.ground_bottom_color = Color(ambiance["ciel"][0] if ambiance["sol"].is_empty() else ambiance["sol"][0])
+	bleu.sun_angle_max = 0.0 if ambiance["soleil"] <= 0.0 else 30.0
 	ciel.sky_material = bleu
-	var ambiance := Environment.new()
-	ambiance.background_mode = Environment.BG_SKY
-	ambiance.sky = ciel
-	ambiance.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	ambiance.ambient_light_energy = 0.8
+	var air := Environment.new()
+	air.background_mode = Environment.BG_SKY
+	air.sky = ciel
+	air.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	air.ambient_light_color = Color(ambiance["lumiere"][0])
+	air.ambient_light_energy = ambiance["lumiere"][1]
+	air.ambient_light_sky_contribution = 0.0
+	if ambiance["brume"][1] > 0.0:
+		air.fog_enabled = true
+		air.fog_light_color = Color(ambiance["brume"][0])
+		air.fog_density = ambiance["brume"][1]
+		air.fog_sky_affect = 0.3
 	var monde := WorldEnvironment.new()
-	monde.environment = ambiance
+	monde.environment = air
 	add_child(monde)
 
 	var soleil := DirectionalLight3D.new()
 	soleil.rotation_degrees = Vector3(-55, 35, 0)
 	soleil.shadow_enabled = true
+	soleil.light_energy = ambiance["soleil"]
+	soleil.visible = ambiance["soleil"] > 0.0
 	soleil.directional_shadow_max_distance = 120.0
 	add_child(soleil)
 
 
 func _sol() -> void:
+	if ambiance["sol"].is_empty():
+		return  # le vide : un kart qui tombe est reposé sur la piste
 	var pre := PlaneMesh.new()
 	pre.size = Vector2(2000, 2000)
-	_objet(pre, _matiere_texture("herbe", Vector3(250, 250, 1)), Vector3(0, -0.3, 0))
+	pre.subdivide_width = 100  # découpé en petits carrés, sinon le brouillard le recouvre d'un coup
+	pre.subdivide_depth = 100
+	if ambiance["sol_dessine"]:
+		_objet(pre, _matiere_texture("sol-" + str(ambiance["sol"]), "bruit", ambiance["sol"], ambiance["sol_grain"], Vector3(250, 250, 1)), Vector3(0, -0.3, 0))
 	var forme := BoxShape3D.new()
 	forme.size = Vector3(2000, 1, 2000)
 	_solide(forme, Transform3D(Basis.IDENTITY, Vector3(0, -0.8, 0)), "herbe")
-
-
-# Trois sortes d'arbres : des ronds, des sapins et des arbres fruitiers.
-func _arbres() -> void:
-	var tronc := _cylindre(0.4, 0.6, 3.0)
-	var feuillage := _boule(2.6)
-	var etage := _cylindre(0.0, 2.2, 3.0)
-	var fruit := _boule(0.35)
-	var bois := _matiere("#7a5230")
-	var verts := [_matiere("#2f8f3a"), _matiere("#3fa34d"), _matiere("#267a45")]
-	var sapin := _matiere("#1f6b4a")
-
-	for i in R.NOMBRE_ARBRES:
-		var ou := _au_hasard_dans_la_zone()
-		var sorte := hasard.randi_range(0, 2)
-		var echelle := hasard.randf_range(0.8, 1.4)
-		var couleur_fruit := _matiere(FRUITS[hasard.randi_range(0, 2)])
-		if not _libre(ou, 5.0):
-			continue
-		var arbre := Node3D.new()
-		arbre.position = Vector3(ou.x, -0.3, ou.y)
-		arbre.scale = Vector3.ONE * echelle
-		arbre.rotation.y = hasard.randf() * TAU
-		add_child(arbre)
-		_objet(tronc, bois, Vector3(0, 1.5, 0), Vector3.ONE, arbre)
-		if sorte == 1:
-			for j in 3:
-				_objet(etage, sapin, Vector3(0, 3.2 + j * 1.6, 0), Vector3.ONE * (1.0 - j * 0.22), arbre)
-		else:
-			_objet(feuillage, verts[i % 3], Vector3(0, 4.6, 0), Vector3.ONE, arbre)
-			_objet(feuillage, verts[(i + 1) % 3], Vector3(1.4, 3.8, 0.6), Vector3.ONE * 0.6, arbre)
-			if sorte == 2:
-				for j in 7:
-					var direction := Vector3(cos(j * 0.9), 0.3 * sin(j * 2.1), sin(j * 0.9)).normalized()
-					_objet(fruit, couleur_fruit, Vector3(0, 4.6, 0) + direction * 2.55, Vector3.ONE, arbre)
-
-
-func _rochers_et_buissons() -> void:
-	var caillou := _boule(1.0)
-	var gris := [_matiere("#8a8f98"), _matiere("#6f747d")]
-	for i in R.NOMBRE_ROCHERS:
-		var ou := _au_hasard_dans_la_zone()
-		var taille := hasard.randf_range(0.6, 2.0)
-		if _libre(ou, 3.0):
-			var m := _objet(caillou, gris[i % 2], Vector3(ou.x, -0.3, ou.y), Vector3(1.4, 0.8, 1.0) * taille)
-			m.rotation.y = hasard.randf() * TAU
-
-	var touffe := _boule(1.0)
-	var verts := [_matiere("#3c8d3f"), _matiere("#56a64b")]
-	for i in R.NOMBRE_BUISSONS:
-		var ou := _au_hasard_dans_la_zone()
-		var taille := hasard.randf_range(0.7, 1.3)
-		if _libre(ou, 2.5):
-			for j in 3:
-				_objet(touffe, verts[(i + j) % 2], Vector3(ou.x + (j - 1) * 0.9 * taille, 0.1, ou.y + (j % 2) * 0.5), Vector3(1.0, 0.75, 1.0) * taille)
-
-
-# Des fleurs de toutes les couleurs au bord de la route.
-func _fleurs() -> void:
-	var fleurs := MultiMesh.new()
-	fleurs.transform_format = MultiMesh.TRANSFORM_3D
-	fleurs.use_colors = true
-	fleurs.mesh = _boule(0.2)
-	fleurs.instance_count = R.NOMBRE_FLEURS
-	var palette := ["#ffffff", "#ffeb3b", "#ff80ab", "#ff7043", "#b39ddb"]
-	for i in R.NOMBRE_FLEURS:
-		var r := repere(hasard.randf() * longueur)
-		var cote := 1.0 if hasard.randf() < 0.5 else -1.0
-		var ou := r.origin + r.basis.x * cote * (largeur / 2.0 + hasard.randf_range(1.2, 14.0))
-		var libre := r.origin.y < 0.5 and _libre(Vector2(ou.x, ou.z), 1.0)
-		# Une fleur qui tomberait sur la route est cachée sous l'herbe.
-		fleurs.set_instance_transform(i, Transform3D(Basis.IDENTITY, Vector3(ou.x, -0.2 if libre else -5.0, ou.z)))
-		fleurs.set_instance_color(i, Color(palette[i % palette.size()]))
-	var matiere := StandardMaterial3D.new()
-	matiere.vertex_color_use_as_albedo = true
-	var champ := MultiMeshInstance3D.new()
-	champ.multimesh = fleurs
-	champ.material_override = matiere
-	champ.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(champ)
-
-
-func _bottes_de_paille() -> void:
-	var botte := _cylindre(0.8, 0.8, 1.5)
-	var paille := _matiere_texture("paille", Vector3(3, 1, 1))
-	for i in 24:
-		var r := repere(hasard.randf() * longueur)
-		var cote := 1.0 if i % 2 == 0 else -1.0
-		var ou := r.origin + r.basis.x * cote * (largeur / 2.0 + 2.2)
-		if r.origin.y < 0.5 and _libre(Vector2(ou.x, ou.z), 1.5):
-			var m := _objet(botte, paille, Vector3(ou.x, 0.5, ou.z))
-			m.basis = Basis(r.basis.y, -r.basis.z, r.basis.x)  # couchée le long de la route
 
 
 # Les tribunes près du départ, avec des fruits qui regardent la course.
@@ -506,33 +453,3 @@ func _tribunes() -> void:
 		_boite(Vector3(5.6, 0.25, 17.0), toit, "#e53935" if cote < 0.0 else "#1e88e5")
 		for z in [-8.0, 8.0]:
 			_boite(Vector3(0.3, 5.6, 0.3), r.translated_local(Vector3(cote * (bord + 4.9), 2.6, z)), "#f5f5f5")
-
-
-# Ce qu'on voit au loin : des collines, des nuages et des montgolfières.
-func _lointain() -> void:
-	var centre := zone.get_center()
-	var rayon := maxf(zone.size.x, zone.size.y) / 2.0 + 200.0
-	var boule := _boule(1.0)
-	var colline := _matiere(Color(R.COULEUR_HERBE).darkened(0.2).to_html())
-	for i in 11:
-		var angle := i * TAU / 11.0 + hasard.randf_range(-0.2, 0.2)
-		var taille := Vector3(hasard.randf_range(110, 190), hasard.randf_range(25, 70), hasard.randf_range(110, 190))
-		_objet(boule, colline, Vector3(centre.x + cos(angle) * rayon, -2.0, centre.y + sin(angle) * rayon), taille)
-
-	var blanc := StandardMaterial3D.new()
-	blanc.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	for i in R.NOMBRE_NUAGES:
-		var ou := _au_hasard_dans_la_zone() * 1.8
-		var hauteur := hasard.randf_range(55, 90)
-		for j in 4:
-			var m := _objet(boule, blanc, Vector3(ou.x + j * 7.0, hauteur + (j % 2) * 2.0, ou.y), Vector3(9, 4.5, 7) * hasard.randf_range(0.7, 1.2))
-			m.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-
-	for i in 3:
-		var ou := _au_hasard_dans_la_zone()
-		var ballon := Node3D.new()
-		ballon.position = Vector3(ou.x, hasard.randf_range(30, 55), ou.y)
-		add_child(ballon)
-		_objet(_boule(6.0), _matiere(FRUITS[i]), Vector3.ZERO, Vector3(1, 1.15, 1), ballon)
-		_objet(_cylindre(4.2, 1.2, 5.0), _matiere(FRUITS[i + 3]), Vector3(0, -6.0, 0), Vector3.ONE, ballon)
-		_objet(_cylindre(1.0, 0.9, 1.4), _matiere("#7a5230"), Vector3(0, -10.5, 0), Vector3.ONE, ballon)

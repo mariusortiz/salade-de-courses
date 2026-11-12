@@ -34,6 +34,12 @@ func _ready() -> void:
 			essai_bonus = option.trim_prefix("--essai-bonus=")
 		elif option.begins_with("--essai-derapage="):
 			essai_derapage = option.trim_prefix("--essai-derapage=")
+		elif option.begins_with("--menu="):
+			_montrer_menu()
+			await get_tree().create_timer(1.0).timeout
+			get_viewport().get_texture().get_image().save_png(option.trim_prefix("--menu="))
+			get_tree().quit()
+			return
 		elif option.begins_with("--galerie="):
 			_galerie(option.trim_prefix("--galerie="))
 			return
@@ -78,10 +84,10 @@ func _montrer_menu() -> void:
 	centre.set_anchors_preset(Control.PRESET_FULL_RECT)
 	menu.add_child(centre)
 	var colonne := VBoxContainer.new()
-	colonne.add_theme_constant_override("separation", 12)
+	colonne.add_theme_constant_override("separation", 6)
 	centre.add_child(colonne)
 
-	_titre(colonne, R.TITRE, 64)
+	_titre(colonne, R.TITRE, 52)
 	_titre(colonne, "Combien de joueurs ?", 22)
 	_rangee(colonne, ["1 joueur", "2 joueurs"], choix["joueurs"] - 1, func(i): choix["joueurs"] = i + 1)
 
@@ -94,7 +100,7 @@ func _montrer_menu() -> void:
 	_titre(colonne, "Circuit", 22)
 	_rangee(colonne, Circuits.CIRCUITS.map(func(c): return c["nom"]), choix["circuit"], func(i): choix["circuit"] = i)
 
-	var demarrer := _bouton("Démarrer", Color("#ff7043"), ENCRE, 34)
+	var demarrer := _bouton("Démarrer", Color("#ff7043"), ENCRE, 30)
 	for etat in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
 		demarrer.add_theme_color_override(etat, Color.WHITE)
 	demarrer.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -134,13 +140,16 @@ func _titre(parent: Control, texte: String, taille: int) -> void:
 
 
 func _rangee(parent: Control, noms: Array, actif: int, au_clic: Callable, bords: Array = []) -> void:
-	var rangee := HBoxContainer.new()
-	rangee.alignment = BoxContainer.ALIGNMENT_CENTER
-	rangee.add_theme_constant_override("separation", 10)
+	# Quand il y a trop de boutons pour une seule ligne, ils passent à la ligne suivante.
+	var rangee := HFlowContainer.new()
+	rangee.alignment = FlowContainer.ALIGNMENT_CENTER
+	rangee.custom_minimum_size.x = 1180
+	rangee.add_theme_constant_override("h_separation", 10)
+	rangee.add_theme_constant_override("v_separation", 8)
 	parent.add_child(rangee)
 	for i in noms.size():
 		var fond := Color("#ffd54f") if i == actif else Color.WHITE
-		var bouton := _bouton(noms[i], fond, bords[i] if not bords.is_empty() else ENCRE, 22)
+		var bouton := _bouton(noms[i], fond, bords[i] if not bords.is_empty() else ENCRE, 20)
 		bouton.pressed.connect(func():
 			au_clic.call(i)
 			_montrer_menu())
@@ -156,9 +165,9 @@ func _bouton(texte: String, fond: Color, bord: Color, taille: int) -> Button:
 	style.border_color = bord
 	style.set_border_width_all(4)
 	style.set_corner_radius_all(14)
-	style.set_content_margin_all(12)
-	style.content_margin_left = 22
-	style.content_margin_right = 22
+	style.set_content_margin_all(8)
+	style.content_margin_left = 18
+	style.content_margin_right = 18
 	var survol: StyleBoxFlat = style.duplicate()
 	survol.bg_color = fond.darkened(0.08)
 	var focus: StyleBoxFlat = style.duplicate()
