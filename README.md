@@ -32,20 +32,21 @@ Si le kart sort de la piste, il y est reposé au bout de deux secondes.
 
 ## Modifier le jeu
 
-Trois fichiers sont faits pour être changés. Chacun commence par son mode d'emploi.
+Quatre fichiers sont faits pour être changés. Chacun commence par son mode d'emploi.
 
 | Fichier | Ce qu'on y change |
 | --- | --- |
 | `donnees/circuits.gd` | Les circuits : la liste des points par où passe la route (avec leur hauteur), les turbos, les tremplins, les cagettes à bonus, la musique |
 | `donnees/pilotes.gd` | Les fruits : nom, forme, motif de la peau, couleurs, vitesse, accélération, maniabilité, modèle 3D |
-| `donnees/reglages.gd` | Le titre, la gravité, l'adhérence, le turbo, le saut, les bonus, le volume de la musique, le niveau des ordinateurs, le décor, les couleurs |
+| `donnees/vehicules.gd` | Les véhicules : nom, forme, et ce qu'ils ajoutent ou enlèvent en vitesse, accélération, maniabilité |
+| `donnees/reglages.gd` | Le titre, la gravité, l'adhérence, le turbo, le saut, les bonus, le volume de la musique, le niveau des ordinateurs, le nombre de karts, les nombres de tours proposés, le décor, les couleurs |
 
 Le reste du code est dans `jeu/` :
 
 - `piste.gd` construit la route, les barrières, les cagettes et le décor à partir des points du circuit, et dessine les textures ;
 - `kart.gd` gère la conduite (une boule qui roule sur la piste, avec le fruit posé dessus) ;
 - `decor.gd` contient les décors (campagne, espace, montagne, grotte, pizza, aquarium, frigo, potager) : leurs couleurs, leur lumière, et les objets posés autour de la route ;
-- `fruit.gd` dessine le fruit (avec ses bras et ses jambes) et son kart ;
+- `fruit.gd` dessine le fruit (avec ses bras et ses jambes) et son véhicule ;
 - `course.gd` gère le départ, les touches, les bonus, les écrans des joueurs et le classement ;
 - `main.gd` gère le menu et la musique.
 

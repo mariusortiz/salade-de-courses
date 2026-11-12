@@ -12,6 +12,8 @@ const ADHERENCE := 7.0        # petit = le kart glisse dans les virages, grand =
 const HERBE := 0.45           # vitesse sur l'herbe (0.45 = 45 % de la vitesse normale)
 const TURBO_FORCE := 1.6      # 1.6 = 60 % plus vite pendant un turbo
 const TURBO_DUREE := 1.5      # en secondes
+const NOMBRE_DE_KARTS := 6    # combien de karts au départ, joueurs compris
+const CHOIX_DE_TOURS := [1, 3, 5]  # les nombres de tours proposés dans le menu
 const NIVEAU_ORDIS := 0.9     # vitesse des karts de l'ordinateur (1 = aussi rapides que toi)
 
 # Le dérapage

@@ -5,6 +5,7 @@ signal finie(resultats: Array)
 
 const Pilotes = preload("res://donnees/pilotes.gd")
 const Piste = preload("res://jeu/piste.gd")
+const Vehicules = preload("res://donnees/vehicules.gd")
 const Kart = preload("res://jeu/kart.gd")
 const R = preload("res://donnees/reglages.gd")
 
@@ -32,21 +33,27 @@ var pepins: Array = []   # les pépins en vol
 var flaques: Array = []  # les flaques de jus sur la route
 
 
-func demarrer(circuit: Dictionary, humains: Array) -> void:
+# humains : les numéros des pilotes des joueurs. vehicules : le numéro du véhicule de chacun.
+# tours : 0 = le nombre de tours écrit dans le circuit.
+func demarrer(circuit: Dictionary, humains: Array, vehicules: Array = [], tours := 0) -> void:
 	piste = Piste.new()
 	add_child(piste)
 	piste.construire(circuit)
+	if tours > 0:
+		piste.tours = tours
 
 	# La grille de départ : deux par deux derrière la ligne, les joueurs au fond.
+	# Les ordinateurs sont tirés au hasard parmi les autres pilotes, avec un véhicule au hasard.
+	var autres: Array = range(Pilotes.PILOTES.size()).filter(func(i): return not humains.has(i))
+	autres.shuffle()
 	var grille: Array = []
-	for i in Pilotes.PILOTES.size():
-		if not humains.has(i):
-			grille.append([i, false])
-	for i in humains:
-		grille.append([i, true])
+	for i in autres.slice(0, maxi(0, R.NOMBRE_DE_KARTS - humains.size())):
+		grille.append([i, false, Vehicules.VEHICULES.pick_random()])
+	for j in humains.size():
+		grille.append([humains[j], true, Vehicules.VEHICULES[vehicules[j] if j < vehicules.size() else 0]])
 	for n in grille.size():
 		var kart := Kart.new()
-		kart.preparer(Pilotes.PILOTES[grille[n][0]], piste, grille[n][1])
+		kart.preparer(Pilotes.PILOTES[grille[n][0]], piste, grille[n][1], grille[n][2])
 		add_child(kart)
 		kart.placer(-4.0 - (n >> 1) * 4.0, -2.5 if n % 2 == 0 else 2.5)
 		kart.distance = kart.position_piste - piste.longueur

@@ -68,16 +68,17 @@ var vitesse_max := 0.0
 var hauteur_max := 0.0
 
 
-func preparer(le_pilote: Dictionary, la_piste: Node3D, est_humain: bool) -> void:
+func preparer(le_pilote: Dictionary, la_piste: Node3D, est_humain: bool, vehicule: Dictionary = {}) -> void:
 	pilote = le_pilote
 	piste = la_piste
 	humain = est_humain
 	auto = not est_humain
 
 	var niveau := 1.0 if humain else R.NIVEAU_ORDIS * randf_range(0.95, 1.03)
-	vmax = (26.0 + pilote["vitesse"] * 1.5) * niveau
-	acceleration = 12.0 + pilote["acceleration"] * 4.0
-	braquage = 1.5 + pilote["maniabilite"] * 0.25
+	# Les points du pilote, plus ou moins ceux de son véhicule.
+	vmax = (26.0 + (pilote["vitesse"] + vehicule.get("vitesse", 0)) * 1.5) * niveau
+	acceleration = 12.0 + (pilote["acceleration"] + vehicule.get("acceleration", 0)) * 4.0
+	braquage = 1.5 + (pilote["maniabilite"] + vehicule.get("maniabilite", 0)) * 0.25
 	cote = randf_range(-0.3, 0.3) * piste.largeur
 
 	boule = RigidBody3D.new()
@@ -97,7 +98,7 @@ func preparer(le_pilote: Dictionary, la_piste: Node3D, est_humain: bool) -> void
 	add_child(boule)
 
 	visuel = Node3D.new()
-	modele = Fruit.creer(pilote)
+	modele = Fruit.creer(pilote, vehicule)
 	visuel.add_child(modele)
 	add_child(visuel)
 

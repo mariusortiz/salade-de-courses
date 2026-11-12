@@ -4,11 +4,12 @@ extends Node
 const R = preload("res://donnees/reglages.gd")
 const Circuits = preload("res://donnees/circuits.gd")
 const Pilotes = preload("res://donnees/pilotes.gd")
+const Vehicules = preload("res://donnees/vehicules.gd")
 const Course = preload("res://jeu/course.gd")
 
 const ENCRE := Color("#1d2433")
 
-var choix := {"joueurs": 1, "pilotes": [0, 1], "circuit": 0}
+var choix := {"joueurs": 1, "pilotes": [0, 1], "vehicules": [0, 0], "circuit": 0, "tours": 3}
 var menu: Control
 var resultats: Control
 var course: Node
@@ -43,6 +44,8 @@ func _ready() -> void:
 		elif option.begins_with("--galerie="):
 			_galerie(option.trim_prefix("--galerie="))
 			return
+		elif option.begins_with("--vehicule="):
+			choix["vehicules"] = [int(option.trim_prefix("--vehicule=")), int(option.trim_prefix("--vehicule="))]
 		elif option.begins_with("--circuit="):
 			choix["circuit"] = int(option.trim_prefix("--circuit="))
 		elif option.begins_with("--joueurs="):
@@ -87,17 +90,36 @@ func _montrer_menu() -> void:
 	colonne.add_theme_constant_override("separation", 6)
 	centre.add_child(colonne)
 
-	_titre(colonne, R.TITRE, 52)
-	_titre(colonne, "Combien de joueurs ?", 22)
-	_rangee(colonne, ["1 joueur", "2 joueurs"], choix["joueurs"] - 1, func(i): choix["joueurs"] = i + 1)
+	_titre(colonne, R.TITRE, 48)
 
+	# Sur la même ligne : le nombre de joueurs et le nombre de tours.
+	var ligne := HBoxContainer.new()
+	ligne.alignment = BoxContainer.ALIGNMENT_CENTER
+	ligne.add_theme_constant_override("separation", 10)
+	colonne.add_child(ligne)
+	_titre(ligne, "Joueurs", 20)
+	_boutons(ligne, ["1", "2"], choix["joueurs"] - 1, func(i): choix["joueurs"] = i + 1)
+	_titre(ligne, "      Tours", 20)
+	_boutons(ligne, R.CHOIX_DE_TOURS.map(func(t): return str(t)), R.CHOIX_DE_TOURS.find(choix["tours"]), func(i): choix["tours"] = R.CHOIX_DE_TOURS[i])
+
+	# Chaque joueur choisit son pilote et son véhicule. À deux, les joueurs sont côte à côte.
 	var noms: Array = Pilotes.PILOTES.map(func(p): return p["nom"])
 	var couleurs: Array = Pilotes.PILOTES.map(func(p): return Color(p["couleur"]))
+	var joueurs := HBoxContainer.new()
+	joueurs.alignment = BoxContainer.ALIGNMENT_CENTER
+	joueurs.add_theme_constant_override("separation", 30)
+	colonne.add_child(joueurs)
+	var largeur := 1180 if choix["joueurs"] == 1 else 590
 	for j in choix["joueurs"]:
-		_titre(colonne, "Joueur %d" % (j + 1), 22)
-		_rangee(colonne, noms, choix["pilotes"][j], func(i): choix["pilotes"][j] = i, couleurs)
+		var bloc := VBoxContainer.new()
+		bloc.add_theme_constant_override("separation", 6)
+		joueurs.add_child(bloc)
+		_titre(bloc, "Joueur %d : pilote" % (j + 1) if choix["joueurs"] == 2 else "Pilote", 20)
+		_rangee(bloc, noms, choix["pilotes"][j], func(i): choix["pilotes"][j] = i, couleurs, largeur)
+		_titre(bloc, "Véhicule", 20)
+		_rangee(bloc, Vehicules.VEHICULES.map(func(v): return v["nom"]), choix["vehicules"][j], func(i): choix["vehicules"][j] = i, [], largeur)
 
-	_titre(colonne, "Circuit", 22)
+	_titre(colonne, "Circuit", 20)
 	_rangee(colonne, Circuits.CIRCUITS.map(func(c): return c["nom"]), choix["circuit"], func(i): choix["circuit"] = i)
 
 	var demarrer := _bouton("Démarrer", Color("#ff7043"), ENCRE, 30)
@@ -139,21 +161,26 @@ func _titre(parent: Control, texte: String, taille: int) -> void:
 	parent.add_child(titre)
 
 
-func _rangee(parent: Control, noms: Array, actif: int, au_clic: Callable, bords: Array = []) -> void:
+func _rangee(parent: Control, noms: Array, actif: int, au_clic: Callable, bords: Array = [], largeur := 1180) -> void:
 	# Quand il y a trop de boutons pour une seule ligne, ils passent à la ligne suivante.
 	var rangee := HFlowContainer.new()
 	rangee.alignment = FlowContainer.ALIGNMENT_CENTER
-	rangee.custom_minimum_size.x = 1180
+	rangee.custom_minimum_size.x = largeur
 	rangee.add_theme_constant_override("h_separation", 10)
 	rangee.add_theme_constant_override("v_separation", 8)
 	parent.add_child(rangee)
+	_boutons(rangee, noms, actif, au_clic, bords)
+
+
+# Ajoute une série de boutons : celui qui est choisi est en jaune.
+func _boutons(parent: Control, noms: Array, actif: int, au_clic: Callable, bords: Array = []) -> void:
 	for i in noms.size():
 		var fond := Color("#ffd54f") if i == actif else Color.WHITE
-		var bouton := _bouton(noms[i], fond, bords[i] if not bords.is_empty() else ENCRE, 20)
+		var bouton := _bouton(noms[i], fond, bords[i] if not bords.is_empty() else ENCRE, 18)
 		bouton.pressed.connect(func():
 			au_clic.call(i)
 			_montrer_menu())
-		rangee.add_child(bouton)
+		parent.add_child(bouton)
 
 
 func _bouton(texte: String, fond: Color, bord: Color, taille: int) -> Button:
@@ -163,11 +190,11 @@ func _bouton(texte: String, fond: Color, bord: Color, taille: int) -> Button:
 	var style := StyleBoxFlat.new()
 	style.bg_color = fond
 	style.border_color = bord
-	style.set_border_width_all(4)
+	style.set_border_width_all(3)
 	style.set_corner_radius_all(14)
-	style.set_content_margin_all(8)
-	style.content_margin_left = 18
-	style.content_margin_right = 18
+	style.set_content_margin_all(6)
+	style.content_margin_left = 14
+	style.content_margin_right = 14
 	var survol: StyleBoxFlat = style.duplicate()
 	survol.bg_color = fond.darkened(0.08)
 	var focus: StyleBoxFlat = style.duplicate()
@@ -202,7 +229,7 @@ func _lancer(demo: bool) -> void:
 	var humains: Array = choix["pilotes"].slice(0, choix["joueurs"])
 	if choix["joueurs"] == 2 and humains[0] == humains[1]:
 		humains[1] = (humains[0] + 1) % Pilotes.PILOTES.size()  # pas deux fois le même fruit
-	course.demarrer(Circuits.CIRCUITS[choix["circuit"]], humains)
+	course.demarrer(Circuits.CIRCUITS[choix["circuit"]], humains, choix["vehicules"], choix["tours"])
 	_jouer(Circuits.CIRCUITS[choix["circuit"]].get("musique", ""))
 
 
@@ -273,13 +300,13 @@ func _galerie(fichier: String) -> void:
 	piste.construire(Circuits.CIRCUITS[0])
 	var depart: Transform3D = piste.repere(20.0)
 	for i in Pilotes.PILOTES.size():
-		var fruit: Node3D = preload("res://jeu/fruit.gd").creer(Pilotes.PILOTES[i])
-		fruit.transform = depart.translated_local(Vector3((i % 3 - 1) * 3.4, 0, -(i / 3) * 4.5)).rotated_local(Vector3.UP, PI + (i % 3 - 1) * 0.35)
+		var fruit: Node3D = preload("res://jeu/fruit.gd").creer(Pilotes.PILOTES[i], Vehicules.VEHICULES[i % Vehicules.VEHICULES.size()])
+		fruit.transform = depart.translated_local(Vector3((i % 4 - 1.5) * 3.3, 0, -(i / 4) * 5.0)).rotated_local(Vector3.UP, PI + (i % 4 - 1.5) * 0.3)
 		add_child(fruit)
 	var camera := Camera3D.new()
 	camera.fov = 50.0
 	add_child(camera)
-	camera.global_position = depart * Vector3(0, 3.2, 8.5)
+	camera.global_position = depart * Vector3(0, 5.0, 9.5)
 	camera.look_at(depart * Vector3(0, 0.8, -2.0))
 	await get_tree().create_timer(1.0).timeout
 	get_viewport().get_texture().get_image().save_png(fichier)

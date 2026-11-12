@@ -1,9 +1,9 @@
 # Fabrique l'apparence d'un pilote : un fruit avec des bras et des jambes,
-# assis dans son kart. Tout est tourné vers l'avant du kart, c'est-à-dire vers -Z.
+# assis dans son véhicule (un kart, un buggy, un bolide, un tracteur ou une cagette). Tout est tourné vers l'avant du kart, c'est-à-dire vers -Z.
 extends RefCounted
 
 
-static func creer(pilote: Dictionary) -> Node3D:
+static func creer(pilote: Dictionary, vehicule: Dictionary = {}) -> Node3D:
 	var chemin: String = pilote.get("modele", "")
 	if chemin != "":
 		if ResourceLoader.exists(chemin):
@@ -14,14 +14,14 @@ static func creer(pilote: Dictionary) -> Node3D:
 		push_warning("Modèle introuvable pour %s : %s. On garde les formes simples." % [pilote["nom"], chemin])
 
 	var kart := Node3D.new()
-	_kart(kart, Color(pilote["kart"]))
+	_kart(kart, Color(pilote["kart"]), vehicule.get("forme", "kart"))
 	_pilote(kart, pilote)
 	return kart
 
 
 # ── Le kart ──────────────────────────────────────────────────
 
-static func _kart(kart: Node3D, couleur: Color) -> void:
+static func _kart(kart: Node3D, couleur: Color, forme: String) -> void:
 	var peinture := _matiere(couleur)
 	peinture.metallic = 0.3
 	peinture.roughness = 0.3
@@ -29,67 +29,115 @@ static func _kart(kart: Node3D, couleur: Color) -> void:
 	var metal := _matiere(Color("#c3c9d4"))
 	metal.metallic = 0.9
 	metal.roughness = 0.25
+	var bois := _matiere(Color("#c58b4e"))
 
-	# Le plancher, le nez et les deux pontons sur les côtés.
+	# Ce que tous les véhicules ont : le plancher, le siège et le volant.
 	_ajouter(kart, _boite(Vector3(1.15, 0.12, 2.6)), sombre, Vector3(0, 0.3, 0))
-	var nez := _ajouter(kart, _capsule(0.42, 1.7), peinture, Vector3(0, 0.42, -0.75))
-	nez.rotation_degrees.x = 90
-	nez.scale = Vector3(1, 1, 0.6)
-	for x in [-0.62, 0.62]:
-		_ajouter(kart, _capsule(0.26, 1.5), peinture, Vector3(x, 0.42, 0.2)).rotation_degrees.x = 90
-
-	# Les pare-chocs.
-	for z in [-1.55, 1.45]:
-		_ajouter(kart, _capsule(0.08, 1.7), metal, Vector3(0, 0.32, z)).rotation_degrees.z = 90
-
-	# Le siège, le moteur et ses deux pots d'échappement.
 	_ajouter(kart, _boite(Vector3(0.85, 0.8, 0.14)), sombre, Vector3(0, 0.78, 0.82)).rotation_degrees.x = -12
-	_ajouter(kart, _boite(Vector3(0.7, 0.4, 0.45)), metal, Vector3(0, 0.52, 1.12))
-	for x in [-0.25, 0.25]:
-		_membre(kart, Vector3(x, 0.6, 1.25), Vector3(x, 0.85, 1.6), 0.07, sombre)
-
-	# L'aileron.
-	_ajouter(kart, _boite(Vector3(1.5, 0.06, 0.38)), peinture, Vector3(0, 1.12, 1.35))
-	for x in [-0.5, 0.5]:
-		_ajouter(kart, _boite(Vector3(0.06, 0.45, 0.06)), sombre, Vector3(x, 0.9, 1.35))
-		_ajouter(kart, _boite(Vector3(0.05, 0.3, 0.42)), peinture, Vector3(x * 1.5, 1.18, 1.35))
-
-	# Le volant.
 	_membre(kart, Vector3(0, 0.55, -0.6), Vector3(0, 0.95, -0.25), 0.04, metal)
 	var cercle := TorusMesh.new()
 	cercle.inner_radius = 0.15
 	cercle.outer_radius = 0.22
 	_ajouter(kart, cercle, sombre, Vector3(0, 0.97, -0.22)).rotation.x = 0.72
 
-	# Les roues. Celles de devant tournent avec le volant (voir kart.gd).
-	var pneu := CylinderMesh.new()
-	pneu.top_radius = 0.34
-	pneu.bottom_radius = 0.34
-	pneu.height = 0.32
-	var jante := CylinderMesh.new()
-	jante.top_radius = 0.19
-	jante.bottom_radius = 0.19
-	jante.height = 0.34
+	# Les roues : [rayon devant, rayon derrière, épaisseur, écart sur les côtés, z devant, z derrière]
+	var roues := [0.34, 0.34, 0.32, 0.84, -0.95, 0.85]
+	match forme:
+		"buggy":
+			roues = [0.5, 0.5, 0.42, 0.98, -1.0, 0.95]
+			var nez := _ajouter(kart, _capsule(0.4, 1.3), peinture, Vector3(0, 0.5, -0.8))
+			nez.rotation_degrees.x = 90
+			nez.scale = Vector3(1, 1, 0.7)
+			# L'arceau derrière le siège, avec ses deux phares.
+			for x: float in [-0.6, 0.6]:
+				_membre(kart, Vector3(x, 0.4, 1.15), Vector3(x * 0.9, 2.5, 0.95), 0.07, metal)
+				_membre(kart, Vector3(x * 0.9, 2.5, 0.95), Vector3(x, 0.5, -0.1), 0.06, metal)
+				_ajouter(kart, _boule(0.16), _matiere(Color("#fff59d")), Vector3(x * 0.5, 2.62, 0.9))
+			_membre(kart, Vector3(-0.54, 2.5, 0.95), Vector3(0.54, 2.5, 0.95), 0.07, metal)
+			# La roue de secours et les pare-chocs.
+			_ajouter(kart, _roue(0.42, 0.3), _matiere(Color("#1c1c1f")), Vector3(0, 0.95, 1.5)).rotation_degrees.x = 90
+			for z in [-1.6, 1.3]:
+				_ajouter(kart, _capsule(0.1, 1.9), metal, Vector3(0, 0.45, z)).rotation_degrees.z = 90
+		"bolide":
+			roues = [0.3, 0.4, 0.42, 0.9, -1.35, 0.9]
+			var nez := _ajouter(kart, _capsule(0.36, 2.6), peinture, Vector3(0, 0.4, -1.1))
+			nez.rotation_degrees.x = 90
+			nez.scale = Vector3(1, 1, 0.55)
+			_ajouter(kart, _boite(Vector3(2.1, 0.06, 0.45)), peinture, Vector3(0, 0.2, -2.3))  # l'aileron avant
+			for x: float in [-0.6, 0.6]:
+				_ajouter(kart, _capsule(0.22, 1.3), peinture, Vector3(x, 0.4, 0.3)).rotation_degrees.x = 90
+				_ajouter(kart, _boite(Vector3(0.06, 0.75, 0.5)), sombre, Vector3(x * 1.3, 1.1, 1.5))
+			_ajouter(kart, _boite(Vector3(1.7, 0.07, 0.5)), peinture, Vector3(0, 1.5, 1.5))  # le grand aileron arrière
+			_ajouter(kart, _capsule(0.3, 1.3), sombre, Vector3(0, 0.75, 1.25)).rotation_degrees.x = 90  # le moteur
+		"tracteur":
+			roues = [0.3, 0.66, 0.4, 0.95, -1.15, 0.7]
+			_ajouter(kart, _boite(Vector3(0.6, 0.5, 1.2)), peinture, Vector3(0, 0.62, -1.15))  # le capot
+			_ajouter(kart, _boite(Vector3(0.62, 0.3, 0.06)), sombre, Vector3(0, 0.6, -1.76))  # la calandre
+			_membre(kart, Vector3(0.18, 0.85, -1.4), Vector3(0.18, 1.7, -1.4), 0.07, sombre)  # la cheminée
+			for x: float in [-0.95, 0.95]:
+				_ajouter(kart, _boite(Vector3(0.5, 0.08, 1.5)), peinture, Vector3(x, 1.4, 0.7))  # les garde-boue
+			_ajouter(kart, _boite(Vector3(1.0, 0.5, 0.5)), peinture, Vector3(0, 0.6, 1.2))
+			_ajouter(kart, _boule(0.14), _matiere(Color("#ffb300")), Vector3(0, 1.3, 1.0))  # le gyrophare
+		"cagette":
+			roues = [0.3, 0.3, 0.12, 0.8, -0.95, 0.85]
+			# Une caisse en bois : deux planches de chaque côté, une devant, une derrière.
+			for x: float in [-0.66, 0.66]:
+				for y: float in [0.5, 0.82]:
+					_ajouter(kart, _boite(Vector3(0.07, 0.26, 2.7)), bois, Vector3(x, y, 0))
+			for z: float in [-1.35, 1.35]:
+				for y: float in [0.5, 0.82]:
+					_ajouter(kart, _boite(Vector3(1.39, 0.26, 0.07)), bois, Vector3(0, y, z))
+			_ajouter(kart, _boite(Vector3(1.39, 0.1, 0.09)), peinture, Vector3(0, 0.66, -1.38))  # une bande de couleur
+			# Le fanion à l'arrière.
+			_membre(kart, Vector3(0.55, 0.9, 1.3), Vector3(0.55, 2.3, 1.3), 0.03, metal)
+			_ajouter(kart, _boite(Vector3(0.03, 0.3, 0.5)), peinture, Vector3(0.55, 2.15, 1.55))
+		_:
+			# Le kart : un nez, deux pontons, les pare-chocs, le moteur, les pots et l'aileron.
+			var nez := _ajouter(kart, _capsule(0.42, 1.7), peinture, Vector3(0, 0.42, -0.75))
+			nez.rotation_degrees.x = 90
+			nez.scale = Vector3(1, 1, 0.6)
+			for x in [-0.62, 0.62]:
+				_ajouter(kart, _capsule(0.26, 1.5), peinture, Vector3(x, 0.42, 0.2)).rotation_degrees.x = 90
+			for z in [-1.55, 1.45]:
+				_ajouter(kart, _capsule(0.08, 1.7), metal, Vector3(0, 0.32, z)).rotation_degrees.z = 90
+			_ajouter(kart, _boite(Vector3(0.7, 0.4, 0.45)), metal, Vector3(0, 0.52, 1.12))
+			for x in [-0.25, 0.25]:
+				_membre(kart, Vector3(x, 0.6, 1.25), Vector3(x, 0.85, 1.6), 0.07, sombre)
+			_ajouter(kart, _boite(Vector3(1.5, 0.06, 0.38)), peinture, Vector3(0, 1.12, 1.35))
+			for x in [-0.5, 0.5]:
+				_ajouter(kart, _boite(Vector3(0.06, 0.45, 0.06)), sombre, Vector3(x, 0.9, 1.35))
+				_ajouter(kart, _boite(Vector3(0.05, 0.3, 0.42)), peinture, Vector3(x * 1.5, 1.18, 1.35))
+
+	# Les roues tournent, et celles de devant suivent le volant (voir kart.gd).
 	var gomme := _matiere(Color("#1c1c1f"))
 	gomme.roughness = 0.9
 	var jaune := _matiere(Color("#ffd54f"))
-	var roues: Array = []
+	var tournantes: Array = []
 	var directrices: Array = []
-	for z in [-0.95, 0.85]:
-		for x in [-0.84, 0.84]:
+	for devant in [true, false]:
+		var rayon: float = roues[0] if devant else roues[1]
+		for x: float in [-roues[3], roues[3]]:
 			var pivot := Node3D.new()
-			pivot.position = Vector3(x, 0.34, z)
+			pivot.position = Vector3(x, rayon, roues[4] if devant else roues[5])
 			kart.add_child(pivot)
 			var roue := Node3D.new()
 			pivot.add_child(roue)
-			_ajouter(roue, pneu, gomme, Vector3.ZERO).rotation_degrees.z = 90
-			_ajouter(roue, jante, jaune, Vector3.ZERO).rotation_degrees.z = 90
-			_ajouter(roue, _boite(Vector3(0.36, 0.5, 0.09)), metal, Vector3.ZERO)  # pour voir la roue tourner
-			roues.append(roue)
-			if z < 0.0:
+			_ajouter(roue, _roue(rayon, roues[2]), gomme, Vector3.ZERO).rotation_degrees.z = 90
+			_ajouter(roue, _roue(rayon * 0.56, roues[2] + 0.02), jaune, Vector3.ZERO).rotation_degrees.z = 90
+			_ajouter(roue, _boite(Vector3(roues[2] + 0.04, rayon * 1.5, 0.09)), metal, Vector3.ZERO)  # pour voir la roue tourner
+			tournantes.append(roue)
+			if devant:
 				directrices.append(pivot)
-	kart.set_meta("roues", roues)
+	kart.set_meta("roues", tournantes)
 	kart.set_meta("directrices", directrices)
+
+
+static func _roue(rayon: float, epaisseur: float) -> CylinderMesh:
+	var roue := CylinderMesh.new()
+	roue.top_radius = rayon
+	roue.bottom_radius = rayon
+	roue.height = epaisseur
+	return roue
 
 
 # ── Le fruit ─────────────────────────────────────────────────
@@ -145,6 +193,11 @@ static func _pilote(kart: Node3D, pilote: Dictionary) -> void:
 			_ajouter(fruit, _boule(0.3), peau, Vector3(0, 0.15, -0.42))  # le grain qui porte le visage
 			visage = Vector3(0, 0.15, -0.68)
 			haut = 0.7
+		"poire":
+			_ajouter(fruit, _boule(0.62), peau, Vector3(0, -0.1, 0))
+			_ajouter(fruit, _boule(0.42), peau, Vector3(0, 0.55, 0))
+			visage = Vector3(0, 0.0, -0.58)
+			haut = 0.95
 		_:
 			_ajouter(fruit, _boule(0.65), peau, Vector3.ZERO).scale = Vector3(1, 0.94, 1)
 
