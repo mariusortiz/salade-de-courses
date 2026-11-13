@@ -218,7 +218,8 @@ func _physics_process(dt: float) -> void:
 		fin = temps
 	if fin >= 0.0 and temps > fin + 2.5 and not annoncee:
 		annoncee = true
-		finie.emit(classement().map(func(k): return {"nom": k.pilote["nom"], "temps": k.arrivee, "humain": k.humain}))
+		finie.emit(classement().map(func(k): return {"nom": k.pilote["nom"], "temps": k.arrivee, "humain": k.humain,
+			"touches": k.touches, "retours": k.retours, "tirs": k.tirs, "cagettes": k.cagettes, "glisses": k.glisses}))
 
 
 func _commander(kart: Node3D, commande: Vector2, boutons: Array) -> void:
@@ -286,6 +287,7 @@ func _avancer_les_pepins(dt: float) -> void:
 			# Un kart qui saute assez haut laisse passer le pépin sous lui.
 			if kart != p["tireur"] and Vector2(ecart.x, ecart.z).length() < (2.4 if aerien else 1.7) and absf(ecart.y) < (2.0 if aerien else 0.9):
 				kart.recevoir_pepin()
+				p["tireur"].tirs += 1
 				fini = true
 				break
 		if fini:

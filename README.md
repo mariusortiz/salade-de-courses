@@ -50,6 +50,9 @@ Chaque jour, le menu propose un défi : un circuit, un mode et une règle spéci
 (le même pour tout le monde ce jour-là). On gagne une étoile en finissant, deux sur le podium,
 trois en gagnant. Les étoiles sont gardées sur l'appareil, et le menu compte les jours de suite.
 
+Chaque circuit a aussi trois défis à lui, à réussir quand on veut (onglet « Du circuit ») : battre un
+chrono, finir sans toucher d'obstacle, toucher des adversaires avec ses pépins, réussir en avion...
+
 Si le kart sort de la piste, il y est reposé au bout de deux secondes.
 
 ## Modifier le jeu
@@ -61,7 +64,7 @@ Cinq fichiers sont faits pour être changés. Chacun commence par son mode d'emp
 | `donnees/circuits.gd` | Les circuits : la liste des points par où passe la route (avec leur hauteur), les turbos, les tremplins, les cagettes à bonus, la musique |
 | `donnees/pilotes.gd` | Les fruits : nom, forme, motif de la peau, couleurs, vitesse, accélération, maniabilité, modèle 3D |
 | `donnees/vehicules.gd` | Les véhicules : nom, forme, et ce qu'ils ajoutent ou enlèvent en vitesse, accélération, maniabilité |
-| `donnees/defis.gd` | Les règles spéciales des défis du jour |
+| `donnees/defis.gd` | Les règles spéciales des défis du jour, et les défis des circuits |
 | `donnees/reglages.gd` | Le titre, la gravité, l'adhérence, le turbo, le saut, les bonus, le volume de la musique, le niveau des ordinateurs, le nombre de karts, les nombres de tours proposés, le décor, les couleurs |
 
 Le reste du code est dans `jeu/` :
@@ -98,7 +101,7 @@ Noter dans `modeles/CREDITS.md` d'où vient chaque modèle et sa licence.
 
 ## Changer la musique
 
-Les musiques sont dans le dossier `musique/` (format `.mp3` ou `.ogg`). Celle du menu et celle de
+Les musiques sont dans le dossier `musique/` (format `.mp3` ou `.ogg`). Chaque circuit a la sienne. Celle du menu et celle de
 l'arrivée se choisissent dans `donnees/reglages.gd`, celle de chaque circuit dans `donnees/circuits.gd`.
 Comme le dépôt est public, on n'y met que de la musique sous licence CC0, et on note sa provenance
 dans `musique/CREDITS.md`. Les musiques de Pixabay ne conviennent pas : leur licence interdit de les

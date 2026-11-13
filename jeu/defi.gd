@@ -56,7 +56,78 @@ static func noter(place: int) -> int:
 static func serie() -> int:
 	var tout := _lire()
 	var jours := 0
+	tout.erase("circuits")
 	var depuis := 0 if tout.has(_date()) else 1  # si on n'a pas encore joué aujourd'hui, la série tient toujours
 	while tout.has(_date(depuis + jours)):
 		jours += 1
 	return jours
+
+
+# ── Les défis des circuits ───────────────────────────────────
+
+# La courbe d'un circuit, la même que celle de la piste (voir piste.gd).
+static func courbe(circuit: Dictionary) -> Curve3D:
+	var trace := Curve3D.new()
+	var points: Array = circuit["points"]
+	var n := points.size()
+	for i in n + 1:
+		var poignee: Vector3 = (points[(i + 1) % n] - points[(i - 1 + n) % n]) / 6.0
+		trace.add_point(points[i % n], -poignee, poignee)
+	return trace
+
+
+# Les trois défis d'un circuit, avec leur texte prêt à afficher.
+static func du_circuit(numero: int) -> Array:
+	var circuit: Dictionary = Circuits.CIRCUITS[numero]
+	var choisis: Array = circuit.get("defis", ["chrono", Defis.AU_CHOIX_KART[numero % Defis.AU_CHOIX_KART.size()], Defis.AU_CHOIX_AVION[numero % Defis.AU_CHOIX_AVION.size()]])
+	var epreuves: Array = []
+	for cle in choisis:
+		var e: Dictionary = Defis.EPREUVES[cle].duplicate()
+		e["cle"] = cle
+		if cle == "chrono":
+			e["combien"] = int(courbe(circuit).get_baked_length() * 3.0 / Defis.CHRONO_VITESSE)
+		if "%d" in e["texte"]:
+			e["texte"] = e["texte"] % e["combien"]
+		epreuves.append(e)
+	return epreuves
+
+
+# Le défi est-il réussi ? « r » est le résultat du joueur à la fin de la course (voir course.gd).
+static func reussie(epreuve: Dictionary, r: Dictionary) -> bool:
+	if r["temps"] < 0.0:
+		return false  # il faut au moins finir la course
+	match epreuve["cle"]:
+		"chrono":
+			return r["temps"] <= epreuve["combien"]
+		"sans_faute":
+			return r["touches"] == 0 and r["retours"] == 0
+		"tireur":
+			return r["tirs"] >= epreuve["combien"]
+		"gourmand":
+			return r["cagettes"] >= epreuve["combien"]
+		"glisse":
+			return r["glisses"] >= epreuve["combien"]
+		"as":
+			return r["retours"] == 0
+		"vol":
+			return r["place"] == 1
+	return false
+
+
+# Les défis déjà réussis sur un circuit (la liste de leurs clés).
+static func reussis(nom_du_circuit: String) -> Array:
+	var circuits = _lire().get("circuits", {})
+	return circuits.get(nom_du_circuit, []) if circuits is Dictionary else []
+
+
+static func valider(nom_du_circuit: String, cle: String) -> void:
+	var tout := _lire()
+	if not tout.get("circuits") is Dictionary:
+		tout["circuits"] = {}
+	var faits: Array = tout["circuits"].get(nom_du_circuit, [])
+	if not faits.has(cle):
+		faits.append(cle)
+	tout["circuits"][nom_du_circuit] = faits
+	var fichier := FileAccess.open(FICHIER, FileAccess.WRITE)
+	if fichier != null:
+		fichier.store_string(JSON.stringify(tout))

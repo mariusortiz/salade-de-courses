@@ -22,7 +22,7 @@ const DISCRET := Color("#9aa6c7")
 
 var GRAS := FontVariation.new()  # la police des titres, en plus épais
 
-var choix := {"joueurs": 1, "pilotes": [0, 1], "vehicules": [0, 0], "circuit": 0, "tours": 3, "avions": false}
+var choix := {"joueurs": 1, "pilotes": [0, 1], "vehicules": [0, 0], "circuit": 0, "tours": 3, "avions": false, "onglet": 0}
 var menu: Control
 var resultats: Control
 var course: Node
@@ -62,8 +62,9 @@ func _ready() -> void:
 			_galerie(option.trim_prefix("--galerie="))
 			return
 		elif option.begins_with("--resultats="):
-			defi = Defi.du_jour()
-			_montrer_resultats([{"nom": "Pastek", "temps": 61.2, "humain": false}, {"nom": "Pépin", "temps": 63.9, "humain": true}, {"nom": "Mimi", "temps": -1.0, "humain": false}])
+			var essai := {"touches": 1, "retours": 0, "tirs": 3, "cagettes": 2, "glisses": 0}
+			defi = {"circuit": 0, "avions": false, "tours": 3, "regle": {"effet": ""}, "epreuve": Defi.du_circuit(0)[1]}
+			_montrer_resultats([{"nom": "Pastek", "temps": 61.2, "humain": false}.merged(essai), {"nom": "Pépin", "temps": 63.9, "humain": true}.merged(essai), {"nom": "Mimi", "temps": -1.0, "humain": false}.merged(essai)])
 			await get_tree().create_timer(1.0).timeout
 			get_viewport().get_texture().get_image().save_png(option.trim_prefix("--resultats="))
 			get_tree().quit()
@@ -77,6 +78,8 @@ func _ready() -> void:
 			choix["vehicules"] = [int(option.trim_prefix("--vehicule=")), int(option.trim_prefix("--vehicule="))]
 		elif option.begins_with("--circuit="):
 			choix["circuit"] = int(option.trim_prefix("--circuit="))
+		elif option.begins_with("--onglet="):
+			choix["onglet"] = int(option.trim_prefix("--onglet="))
 		elif option.begins_with("--joueurs="):
 			choix["joueurs"] = int(option.trim_prefix("--joueurs="))
 	if essai_circuit >= 0:
@@ -147,7 +150,7 @@ func _montrer_menu() -> void:
 	droite.custom_minimum_size.x = 400 if choix["joueurs"] == 1 else 340
 	corps.add_child(droite)
 	_carte_du_circuit(droite)
-	_carte_du_defi(droite)
+	_carte_des_defis(droite)
 
 	# En bas : le rappel des touches et le bouton pour partir.
 	var pied := HBoxContainer.new()
@@ -250,7 +253,7 @@ func _carte_du_circuit(parent: Control) -> void:
 	var carte := _carte(parent, "Circuit")
 	carte.get_parent().size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var circuit: Dictionary = Circuits.CIRCUITS[choix["circuit"]]
-	var longueur := _plan(carte, circuit, Vector2(330, 150))
+	var longueur := _plan(carte, circuit, Vector2(330, 150) if choix["joueurs"] == 1 else Vector2(300, 96))
 	var nombre := Circuits.CIRCUITS.size()
 	_selecteur(carte, circuit["nom"], TEXTE, 22,
 		func(): choix["circuit"] = (choix["circuit"] + nombre - 1) % nombre,
@@ -273,13 +276,7 @@ func _plan(parent: Control, circuit: Dictionary, taille: Vector2) -> int:
 	fond.clip_contents = true
 	parent.add_child(fond)
 
-	# La même courbe que celle de la piste (voir piste.gd).
-	var courbe := Curve3D.new()
-	var points: Array = circuit["points"]
-	var n := points.size()
-	for i in n + 1:
-		var poignee: Vector3 = (points[(i + 1) % n] - points[(i - 1 + n) % n]) / 6.0
-		courbe.add_point(points[i % n], -poignee, poignee)
+	var courbe: Curve3D = Defi.courbe(circuit)
 	var trace := PackedVector2Array()
 	var zone := Rect2()
 	for i in 160:
@@ -306,12 +303,29 @@ func _plan(parent: Control, circuit: Dictionary, taille: Vector2) -> int:
 	return int(courbe.get_baked_length())
 
 
-# La carte du défi du jour.
-func _carte_du_defi(parent: Control) -> void:
+# La carte des défis, avec deux onglets : le défi du jour, et les trois défis du circuit choisi.
+func _carte_des_defis(parent: Control) -> void:
+	var carte := _carte(parent, "Défis")
+	var onglets := HBoxContainer.new()
+	onglets.add_theme_constant_override("separation", 6)
+	carte.add_child(onglets)
+	for i in 2:
+		var onglet := _bouton(["Du jour", "Du circuit"][i], JAUNE if i == choix["onglet"] else CARTE_CLAIRE, FOND if i == choix["onglet"] else TEXTE, 15)
+		onglet.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		onglet.pressed.connect(func():
+			choix["onglet"] = i
+			_montrer_menu())
+		onglets.add_child(onglet)
+	if choix["onglet"] == 0:
+		_defi_du_jour(carte)
+	else:
+		_defis_du_circuit(carte)
+
+
+func _defi_du_jour(carte: Control) -> void:
 	var du_jour: Dictionary = Defi.du_jour()
-	var carte := _carte(parent, "Défi du jour")
 	var regle: Dictionary = du_jour["regle"]
-	_texte(carte, regle["nom"], 20, JAUNE, true)
+	_texte(carte, regle["nom"], 19, JAUNE, true)
 	var description := _texte(carte, "%s  ·  %s  ·  %d tours\n%s" % [Circuits.CIRCUITS[du_jour["circuit"]]["nom"], "Avions" if du_jour["avions"] else "Karts", du_jour["tours"], regle["texte"]], 14, TEXTE)
 	description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	var ligne := HBoxContainer.new()
@@ -321,11 +335,34 @@ func _carte_du_defi(parent: Control) -> void:
 	var serie := Defi.serie()
 	var suite := _texte(ligne, "Série : %d jour%s" % [serie, "s" if serie > 1 else ""] if serie > 0 else "Pas encore joué", 14, DISCRET)
 	suite.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var jouer := _bouton("Jouer le défi", CARTE_CLAIRE, JAUNE, 17)
+	var jouer := _bouton("Jouer", CARTE_CLAIRE, JAUNE, 16)
 	jouer.pressed.connect(func():
 		defi = du_jour
 		_lancer(false))
 	ligne.add_child(jouer)
+
+
+# Les trois défis du circuit choisi : une pastille jaune quand le défi est réussi.
+func _defis_du_circuit(carte: Control) -> void:
+	var nom: String = Circuits.CIRCUITS[choix["circuit"]]["nom"]
+	var faits: Array = Defi.reussis(nom)
+	for epreuve in Defi.du_circuit(choix["circuit"]):
+		var ligne := HBoxContainer.new()
+		ligne.add_theme_constant_override("separation", 10)
+		carte.add_child(ligne)
+		_pastilles(ligne, 1 if faits.has(epreuve["cle"]) else 0, 1, JAUNE, 16)
+		var textes := VBoxContainer.new()
+		textes.add_theme_constant_override("separation", 0)
+		textes.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		ligne.add_child(textes)
+		_texte(textes, epreuve["nom"], 15, JAUNE if faits.has(epreuve["cle"]) else TEXTE, true)
+		_texte(textes, epreuve["texte"], 12, DISCRET).autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		var jouer := _bouton("Jouer", CARTE_CLAIRE, JAUNE, 14)
+		jouer.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		jouer.pressed.connect(func():
+			defi = {"circuit": choix["circuit"], "avions": epreuve["avions"], "tours": 3, "regle": {"effet": ""}, "epreuve": epreuve}
+			_lancer(false))
+		ligne.add_child(jouer)
 
 
 # ── Les briques du menu ──────────────────────────────────────
@@ -485,15 +522,23 @@ func _montrer_resultats(classement: Array) -> void:
 	var centre := CenterContainer.new()
 	centre.set_anchors_preset(Control.PRESET_FULL_RECT)
 	resultats.add_child(centre)
-	var carte := _carte(centre, "Défi du jour" if not defi.is_empty() else "Résultat")
+	var titre := "Résultat"
+	if defi.has("epreuve"):
+		titre = "Défi : " + defi["epreuve"]["nom"]
+	elif not defi.is_empty():
+		titre = "Défi du jour"
+	var carte := _carte(centre, titre)
 	carte.custom_minimum_size.x = 440
 	_texte(carte, "Classement", 34, TEXTE, true)
 
 	var place := 0
+	var joueur := {}
 	for i in classement.size():
 		var r: Dictionary = classement[i]
 		if r["humain"] and place == 0:
 			place = i + 1
+			joueur = r
+			joueur["place"] = place
 		var ligne := HBoxContainer.new()
 		ligne.add_theme_constant_override("separation", 14)
 		carte.add_child(ligne)
@@ -503,7 +548,19 @@ func _montrer_resultats(classement: Array) -> void:
 		_texte(ligne, "%.1f s" % r["temps"] if r["temps"] >= 0.0 else "—", 20, couleur)
 
 	# Le défi du jour : on gagne une, deux ou trois étoiles.
-	if not defi.is_empty() and place > 0:
+	if defi.has("epreuve") and place > 0:
+		# Un défi du circuit : réussi ou raté.
+		var gagne: bool = Defi.reussie(defi["epreuve"], joueur)
+		if gagne:
+			Defi.valider(Circuits.CIRCUITS[defi["circuit"]]["nom"], defi["epreuve"]["cle"])
+		var ligne := HBoxContainer.new()
+		ligne.add_theme_constant_override("separation", 12)
+		carte.add_child(ligne)
+		_pastilles(ligne, 1 if gagne else 0, 1, JAUNE, 22)
+		var verdict := _texte(ligne, "Défi réussi !" if gagne else "Raté. " + defi["epreuve"]["texte"], 16, JAUNE if gagne else DISCRET, true)
+		verdict.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		verdict.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	elif not defi.is_empty() and place > 0:
 		var etoiles := Defi.noter(place)
 		var ligne := HBoxContainer.new()
 		ligne.add_theme_constant_override("separation", 12)

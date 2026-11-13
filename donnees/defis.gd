@@ -14,6 +14,16 @@
 #              "patinoire"  la route glisse (karts seulement)
 #
 #  On gagne une étoile en finissant la course, deux sur le podium, trois en gagnant.
+#
+#  LES DÉFIS DES CIRCUITS
+#  Chaque circuit a trois défis, à réussir quand on veut. Ils se jouent seul, en 3 tours.
+#  Un circuit peut choisir les siens avec "defis" (voir donnees/circuits.gd), sinon il en
+#  reçoit trois : le chrono, un défi de kart et un défi d'avion.
+#
+#    nom      le nom du défi
+#    texte    ce qu'il faut faire (%d est remplacé par le nombre « combien »)
+#    avions   true = le défi se joue en avion
+#    combien  le nombre à atteindre
 # ─────────────────────────────────────────────────────────────
 extends RefCounted
 
@@ -27,3 +37,20 @@ const REGLES := [
 ]
 
 const ETOILES := ["Finir la course", "Finir sur le podium", "Gagner la course"]
+
+const EPREUVES := {
+	"chrono": {"nom": "Contre la montre", "texte": "Finis les 3 tours en moins de %d secondes.", "avions": false, "combien": 0},
+	"sans_faute": {"nom": "Sans une égratignure", "texte": "Finis sans toucher d'obstacle et sans sortir de la piste.", "avions": false, "combien": 0},
+	"tireur": {"nom": "Tireur d'élite", "texte": "Touche %d adversaires avec tes pépins.", "avions": false, "combien": 3},
+	"gourmand": {"nom": "Gourmand", "texte": "Ramasse %d cagettes.", "avions": false, "combien": 6},
+	"glisse": {"nom": "Roi de la glisse", "texte": "Gagne %d turbos en dérapant.", "avions": false, "combien": 4},
+	"as": {"nom": "As du ciel", "texte": "En avion, finis sans rater un seul anneau.", "avions": true, "combien": 0},
+	"vol": {"nom": "Premier de la classe", "texte": "En avion, gagne la course.", "avions": true, "combien": 0},
+}
+
+# Pour le chrono : la vitesse moyenne à tenir, en mètres par seconde. Plus grand = plus dur.
+const CHRONO_VITESSE := 26.0
+
+# Les défis donnés aux circuits qui n'ont pas choisi les leurs : le chrono, puis un de chaque liste, à tour de rôle.
+const AU_CHOIX_KART := ["sans_faute", "tireur", "gourmand", "glisse"]
+const AU_CHOIX_AVION := ["as", "vol"]

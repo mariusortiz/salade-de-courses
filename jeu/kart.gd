@@ -48,6 +48,11 @@ var bouclier := 0.0       # secondes de bouclier qui restent
 var toupie := 0.0         # secondes de tête-à-queue qui restent
 var englue := 0.0         # secondes de ralentissement dans le jus qui restent
 var repos_saut := 0.0
+# Ce que le joueur a fait pendant la course, pour les défis.
+var touches := 0          # obstacles touchés
+var tirs := 0             # adversaires touchés avec un pépin
+var cagettes := 0         # cagettes ramassées
+var glisses := 0          # turbos gagnés en dérapant
 var protege := 0.0        # secondes pendant lesquelles un obstacle ne peut plus nous toucher
 var tir_avant := false
 var objet_avant := false
@@ -174,6 +179,7 @@ func devant() -> Vector3:
 
 # Le kart roule sur une cagette : il gagne une chose au hasard.
 func ramasser() -> void:
+	cagettes += 1
 	var bonus: String = R.BONUS.pick_random()
 	if bonus == "pepins" or objet != "":
 		# Si on a déjà un objet en réserve, on gagne des pépins à la place.
@@ -218,6 +224,7 @@ func heurter() -> void:
 	if protege > 0.0:
 		return
 	protege = R.TETE_A_QUEUE + 2.0
+	touches += 1
 	if bouclier > 0.0:
 		bouclier = 0.0
 	else:
@@ -331,8 +338,10 @@ func _avancer(dt: float) -> void:
 	elif not bouton or vitesse < vmax * 0.3 or en_toupie:
 		if not bouton and charge >= R.DERAPAGE_GRAND_TURBO:
 			turbo = R.TURBO_DUREE
+			glisses += 1
 		elif not bouton and charge >= R.DERAPAGE_PETIT_TURBO:
 			turbo = R.TURBO_DUREE * 0.5
+			glisses += 1
 		derapage = 0.0
 	elif au_sol:
 		charge += dt

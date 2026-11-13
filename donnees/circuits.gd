@@ -18,6 +18,8 @@
 #    obstacles  où poser les obstacles (si on n'écrit rien : 0.3, 0.5, 0.7 et 0.9).
 #               Une fois sur deux ils ne bougent pas, sinon ils traversent la route.
 #    musique    le fichier de musique du circuit, dans le dossier musique/
+#    defis      les trois défis du circuit (si on n'écrit rien, le jeu en choisit trois).
+#               Les défis possibles sont dans donnees/defis.gd.
 #    decor      "campagne" (si on n'écrit rien), "espace", "montagne", "grotte", "pizza",
 #               "aquarium", "frigo" ou "potager". Les décors sont fabriqués dans jeu/decor.gd.
 #               Certains changent la conduite : on flotte dans l'espace et dans l'aquarium,
@@ -82,7 +84,7 @@ const CIRCUITS := [
 		"turbos": [0.05, 0.55],
 		"tremplins": [],
 		"bonus": [0.2, 0.45, 0.75],
-		"musique": "res://musique/course-3.mp3",
+		"musique": "res://musique/espace.ogg",
 		"points": [
 			Vector3(93, 5.6, -23),
 			Vector3(79, 3.1, -54),
@@ -110,7 +112,7 @@ const CIRCUITS := [
 		"turbos": [0.03],
 		"tremplins": [],
 		"bonus": [0.15, 0.5, 0.8],
-		"musique": "res://musique/course-1.mp3",
+		"musique": "res://musique/montagne.ogg",
 		"points": [
 			Vector3(119, 0, 0),
 			Vector3(102, 0.9, 32),
@@ -138,7 +140,7 @@ const CIRCUITS := [
 		"turbos": [0.05, 0.5],
 		"tremplins": [],
 		"bonus": [0.2, 0.6, 0.85],
-		"musique": "res://musique/course-2.mp3",
+		"musique": "res://musique/grotte.ogg",
 		"points": [
 			Vector3(114, 3, 0),
 			Vector3(92, 5.1, 24),
@@ -166,7 +168,7 @@ const CIRCUITS := [
 		"turbos": [0.1, 0.6],
 		"tremplins": [],
 		"bonus": [0.25, 0.5, 0.85],
-		"musique": "res://musique/course-1.mp3",
+		"musique": "res://musique/pizza.ogg",
 		"points": [
 			Vector3(87, 0, 0),
 			Vector3(67, 0, 30),
@@ -193,7 +195,7 @@ const CIRCUITS := [
 		"turbos": [0.06, 0.55],
 		"tremplins": [],
 		"bonus": [0.2, 0.45, 0.8],
-		"musique": "res://musique/course-3.mp3",
+		"musique": "res://musique/aquarium.ogg",
 		"points": [
 			Vector3(105, 0, 26),
 			Vector3(97, 0.9, 38),
@@ -221,7 +223,7 @@ const CIRCUITS := [
 		"turbos": [0.05],
 		"tremplins": [],
 		"bonus": [0.2, 0.5, 0.8],
-		"musique": "res://musique/course-2.mp3",
+		"musique": "res://musique/frigo.ogg",
 		"points": [
 			Vector3(0, 0, 55),
 			Vector3(-52, 0, 52),
@@ -249,7 +251,7 @@ const CIRCUITS := [
 		"turbos": [0.05, 0.5],
 		"tremplins": [],
 		"bonus": [0.15, 0.4, 0.7],
-		"musique": "res://musique/course-1.mp3",
+		"musique": "res://musique/potager.ogg",
 		"points": [
 			Vector3(70, 2.1, 34),
 			Vector3(38, 2.8, 44),
