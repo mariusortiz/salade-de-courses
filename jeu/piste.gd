@@ -16,10 +16,14 @@ var largeur := 12.0
 var tours := 3
 var turbos: Array = []    # positions des turbos, en mètres depuis le départ
 const RAYON_ANNEAU := 6.0
+const LARGEUR_RACCOURCI := 7.0
 
 var anneaux: Array = []   # les anneaux du mode Avions, dans l'ordre
 var obstacles: Array = [] # les obstacles : les toucher fait faire un tête-à-queue
 var horloge := 0.0
+var raccourcis: Array = []  # les raccourcis : leur courbe, où ils commencent et combien de route ils remplacent
+var pas_de_raccourci: Array[Vector3] = []  # un point de raccourci tous les 1,5 mètre
+var graines: Array = []   # les graines à ramasser pendant une chasse aux graines
 var regle := ""           # la règle du défi du jour, s'il y en a une (voir donnees/defis.gd)
 var niveau_ordis: float = R.NIVEAU_ORDIS
 var cagettes: Array = []  # les cagettes à bonus posées sur la route
@@ -68,8 +72,13 @@ func construire(def: Dictionary, aerien := false) -> void:
 
 	_ciel_et_lumiere()
 	_sol()
+	if not aerien:
+		for bouts in def.get("raccourcis", []):
+			_tracer_un_raccourci(float(bouts[0]) * longueur, float(bouts[1]) * longueur)
 	_route()
 	_piliers()
+	for numero in raccourcis.size():
+		_construire_un_raccourci(numero)
 	_ligne_de_depart()
 	for part in def.get("turbos", []):
 		turbos.append(float(part) * longueur)
@@ -98,6 +107,8 @@ func _process(dt: float) -> void:
 		o["noeud"].position = o["base"] + o["axe"] * va_et_vient
 		o["noeud"].rotate_y(dt)
 		o["voie"] = o["voie_de_base"] + (va_et_vient if o["en_travers"] else 0.0)
+	for g in graines:
+		g["noeud"].rotate_y(dt * 3.0)
 	for a in animes:
 		var noeud: Node3D = a["noeud"]
 		if a.has("monte"):
@@ -158,6 +169,8 @@ func _route() -> void:
 			var pb := b.origin + b.basis.x * demi * cote
 			var oa := pa + a.basis.x * 0.4 * cote
 			var ob := pb + b.basis.x * 0.4 * cote
+			if _sur_un_raccourci((pa + pb) / 2.0):
+				continue  # pas de barrière devant l'entrée ou la sortie d'un raccourci
 			_carre(murs, pa, pa + h, pb + h, pb, -a.basis.x * cote, rouge_blanc)
 			_carre(murs, pa + h, oa + h, ob + h, pb + h, Vector3.UP, rouge_blanc.darkened(0.15))
 			_carre(murs, oa, oa + h, ob + h, ob, a.basis.x * cote, rouge_blanc)
@@ -186,7 +199,7 @@ func _carre(outil: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3, 
 
 
 # Affiche un maillage et le rend solide. « sol » dit aux karts sur quoi ils roulent.
-func _poser(maillage: ArrayMesh, sol: String, matiere: Material) -> MeshInstance3D:
+func _poser(maillage: ArrayMesh, sol: String, matiere: Material, raccourci := -1) -> MeshInstance3D:
 	var visible_ := MeshInstance3D.new()
 	visible_.mesh = maillage
 	visible_.material_override = matiere
@@ -194,18 +207,114 @@ func _poser(maillage: ArrayMesh, sol: String, matiere: Material) -> MeshInstance
 
 	var forme: ConcavePolygonShape3D = maillage.create_trimesh_shape()
 	forme.backface_collision = true
-	_solide(forme, Transform3D.IDENTITY, sol)
+	_solide(forme, Transform3D.IDENTITY, sol, raccourci)
 	return visible_
 
 
-func _solide(forme: Shape3D, ou: Transform3D, sol: String) -> void:
+func _solide(forme: Shape3D, ou: Transform3D, sol: String, raccourci := -1) -> void:
 	var corps := StaticBody3D.new()
 	corps.set_meta("sol", sol)
+	if raccourci >= 0:
+		corps.set_meta("raccourci", raccourci)  # pour que le kart sache où il en est (voir kart.gd)
 	corps.transform = ou
 	var collision := CollisionShape3D.new()
 	collision.shape = forme
 	corps.add_child(collision)
 	add_child(corps)
+
+
+# ── Les raccourcis ───────────────────────────────────────────
+
+# Un raccourci part de la route, coupe tout droit, et la rejoint plus loin.
+func _tracer_un_raccourci(de: float, a: float) -> void:
+	var debut := repere(de)
+	var bout := repere(a)
+	var corde := bout.origin - debut.origin
+	# Il quitte la route en douceur, et la retrouve en douceur.
+	var sortie := (-debut.basis.z + corde.normalized()).normalized() * corde.length() * 0.3
+	var entree := (-bout.basis.z + corde.normalized()).normalized() * corde.length() * 0.3
+	var trace := Curve3D.new()
+	trace.bake_interval = 1.0
+	trace.add_point(debut.origin, Vector3.ZERO, sortie)
+	trace.add_point(bout.origin, -entree, Vector3.ZERO)
+	raccourcis.append({"courbe": trace, "longueur": trace.get_baked_length(), "de": de, "remplace": a - de})
+	var d := 0.0
+	while d < trace.get_baked_length():
+		pas_de_raccourci.append(trace.sample_baked(d))
+		d += 1.5
+
+
+func _sur_un_raccourci(ou: Vector3) -> bool:
+	for p in pas_de_raccourci:
+		if absf(p.y - ou.y) < 2.0 and Vector2(p.x - ou.x, p.z - ou.z).length() < LARGEUR_RACCOURCI / 2.0 + 0.6:
+			return true
+	return false
+
+
+func _construire_un_raccourci(numero: int) -> void:
+	var trace: Curve3D = raccourcis[numero]["courbe"]
+	var long: float = raccourcis[numero]["longueur"]
+	var chemin := SurfaceTool.new()
+	var murs := SurfaceTool.new()
+	chemin.begin(Mesh.PRIMITIVE_TRIANGLES)
+	murs.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var demi := LARGEUR_RACCOURCI / 2.0
+	var h := Vector3.UP * R.HAUTEUR_BARRIERES
+	var dessus := Vector3.UP * 0.04  # un tout petit peu au-dessus de la route, là où ils se touchent
+	var troncons := int(ceil(long / 2.0))
+	for i in troncons:
+		var a := _repere_de(trace, i * long / troncons)
+		var b := _repere_de(trace, (i + 1) * long / troncons)
+		_carre(chemin, a.origin - a.basis.x * demi + dessus, b.origin - b.basis.x * demi + dessus, b.origin + b.basis.x * demi + dessus, a.origin + a.basis.x * demi + dessus,
+			Vector3.UP, Color.WHITE, Vector2(0, i * 0.25), Vector2(0, (i + 1) * 0.25), Vector2(1, (i + 1) * 0.25), Vector2(1, i * 0.25))
+		var teinte := Color(ambiance["lignes"][1] if i % 2 == 0 else ambiance["barrieres"][0])
+		for cote: float in [-1.0, 1.0]:
+			var pa := a.origin + a.basis.x * demi * cote
+			var pb := b.origin + b.basis.x * demi * cote
+			# Pas de barrière là où le raccourci est encore sur la route.
+			var milieu := (pa + pb) / 2.0
+			var route := courbe.get_closest_point(milieu)
+			if absf(route.y - milieu.y) < 2.5 and Vector2(route.x - milieu.x, route.z - milieu.z).length() < largeur / 2.0 + 0.5:
+				continue
+			var oa := pa + a.basis.x * 0.3 * cote
+			var ob := pb + b.basis.x * 0.3 * cote
+			_carre(murs, pa, pa + h, pb + h, pb, -a.basis.x * cote, teinte)
+			_carre(murs, pa + h, oa + h, ob + h, pb + h, Vector3.UP, teinte.darkened(0.15))
+			_carre(murs, oa + Vector3.DOWN * 0.7, oa + h, ob + h, ob + Vector3.DOWN * 0.7, a.basis.x * cote, teinte)
+		# Des piliers si le raccourci est en hauteur.
+		if i % 6 == 3 and a.origin.y > 1.5 and not ambiance["sol"].is_empty():
+			_objet(_cylindre(0.7, 0.9, 1.0), _matiere("#8d939e"), Vector3(a.origin.x, a.origin.y / 2.0 - 0.2, a.origin.z), Vector3(1, a.origin.y + 0.2, 1))
+
+	var terre := _matiere_texture("raccourci-" + str(ambiance["route"]), "bruit", [Color(ambiance["route"][0]).lightened(0.35).to_html(), Color(ambiance["route"][1]).lightened(0.2).to_html()], 0.25)
+	terre.cull_mode = BaseMaterial3D.CULL_DISABLED
+	terre.vertex_color_use_as_albedo = true
+	_poser(chemin.commit(), "route", terre, numero)
+	var peinture := StandardMaterial3D.new()
+	peinture.vertex_color_use_as_albedo = true
+	peinture.cull_mode = BaseMaterial3D.CULL_DISABLED
+	_poser(murs.commit(), "mur", peinture).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+	# Un panneau à l'entrée.
+	var entree := _repere_de(trace, minf(22.0, long * 0.3))
+	var panneau := Label3D.new()
+	panneau.text = "RACCOURCI"
+	panneau.font_size = 90
+	panneau.pixel_size = 0.012
+	panneau.outline_size = 22
+	panneau.modulate = Color(ambiance["lignes"][1])
+	panneau.outline_modulate = Color("#1d2433")
+	panneau.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	panneau.position = entree.origin + Vector3.UP * 4.5
+	add_child(panneau)
+
+
+func _repere_de(trace: Curve3D, distance: float) -> Transform3D:
+	var long := trace.get_baked_length()
+	var d := clampf(distance, 0.0, long - 0.6)
+	var p := trace.sample_baked(d, true)
+	var avant := (trace.sample_baked(d + 0.5, true) - p).normalized()
+	var droite := avant.cross(Vector3.UP).normalized()
+	return Transform3D(Basis(droite, droite.cross(avant), -avant), p)
 
 
 # Des piliers sous la route quand elle est en hauteur (sauf au-dessus d'une autre route).
@@ -333,6 +442,9 @@ func _libre(ou: Vector2, marge: float) -> bool:
 	for p in jalons:
 		if Vector2(p.x, p.z).distance_to(ou) < largeur / 2.0 + marge:
 			return false
+	for p in pas_de_raccourci:
+		if Vector2(p.x, p.z).distance_to(ou) < LARGEUR_RACCOURCI / 2.0 + marge:
+			return false
 	return true
 
 
@@ -441,6 +553,22 @@ func _anneaux(def: Dictionary) -> void:
 				_cagette(centre + r.basis.x * (i - 1) * 3.0)
 
 
+# Pose une graine au hasard sur la route (ou la déplace si elle existe déjà).
+func semer(graine: Dictionary = {}) -> void:
+	if graine.is_empty():
+		var forme := _boule(0.75)
+		var dore := StandardMaterial3D.new()
+		dore.albedo_color = Color("#ffd54f")
+		dore.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		graine = {"noeud": _objet(forme, dore, Vector3.ZERO, Vector3(0.7, 1.0, 0.45))}
+		graines.append(graine)
+	graine["distance"] = randf() * longueur
+	graine["voie"] = randf_range(-0.4, 0.4) * largeur
+	var r := repere(graine["distance"])
+	graine["noeud"].position = r.origin + r.basis.x * graine["voie"] + r.basis.y * 1.1
+	graine["noeud"].visible = true
+
+
 # Les obstacles. En kart : aux endroits écrits dans "obstacles" (une fois sur deux, deux obstacles
 # qui ne bougent pas, sinon un obstacle qui traverse la route). En avion : entre deux anneaux.
 func _obstacles(def: Dictionary, aerien: bool, decorateur: RefCounted, decor: String) -> void:
@@ -471,6 +599,10 @@ func _obstacles(def: Dictionary, aerien: bool, decorateur: RefCounted, decor: St
 		else:
 			_obstacle(decorateur, decor, base, r.basis.x, largeur / 2.0 - 2.4, ou * longueur, 0.0, true)
 		numero += 1
+	# Un obstacle qui va et vient au milieu de chaque raccourci : il faut le mériter !
+	for raccourci in raccourcis:
+		var milieu := _repere_de(raccourci["courbe"], raccourci["longueur"] / 2.0)
+		_obstacle(decorateur, decor, milieu.origin + Vector3.UP * 1.3, milieu.basis.x, LARGEUR_RACCOURCI / 2.0 - 1.9, 0.0, 999.0, false)
 
 
 func _obstacle(decorateur: RefCounted, decor: String, base: Vector3, axe: Vector3, amplitude: float, distance: float, voie: float, en_travers: bool) -> void:

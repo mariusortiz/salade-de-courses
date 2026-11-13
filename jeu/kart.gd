@@ -53,6 +53,11 @@ var touches := 0          # obstacles touchés
 var tirs := 0             # adversaires touchés avec un pépin
 var cagettes := 0         # cagettes ramassées
 var glisses := 0          # turbos gagnés en dérapant
+var elimine := false      # sorti de la course (épreuves Élimination et Patate chaude)
+var score := 0            # les graines ramassées pendant une chasse aux graines
+var bonus_vitesse := 1.0  # celui qui porte la patate va plus vite
+var proie: Node3D         # l'ordinateur qui porte la patate poursuit ce kart
+var sur_raccourci := false
 var protege := 0.0        # secondes pendant lesquelles un obstacle ne peut plus nous toucher
 var tir_avant := false
 var objet_avant := false
@@ -220,6 +225,21 @@ func recevoir_pepin() -> void:
 
 # Le kart touche un obstacle : tête-à-queue, sauf si le bouclier le protège.
 # Ensuite il est tranquille quelques secondes, le temps de repartir.
+# Sort le kart de la course : il disparaît et ne bouge plus.
+func eliminer() -> void:
+	elimine = true
+	visible = false
+	process_mode = Node.PROCESS_MODE_DISABLED
+	_ranger()
+
+
+func _ranger() -> void:
+	boule.freeze = true
+	boule.collision_layer = 0
+	boule.collision_mask = 0
+	boule.global_position = Vector3(0, -1000, 0)
+
+
 func heurter() -> void:
 	if protege > 0.0:
 		return
@@ -324,7 +344,7 @@ func _avancer(dt: float) -> void:
 
 	# Les turbos.
 	for t in piste.turbos:
-		if au_sol and absf(wrapf(position_piste - t, -piste.longueur / 2.0, piste.longueur / 2.0)) < 3.0:
+		if au_sol and not sur_raccourci and absf(wrapf(position_piste - t, -piste.longueur / 2.0, piste.longueur / 2.0)) < 3.0:
 			turbo = R.TURBO_DUREE
 	turbo = maxf(0.0, turbo - dt)
 
@@ -364,7 +384,7 @@ func _avancer(dt: float) -> void:
 		var v_haut := v.dot(normale)
 		var v_cote := v - avant * v_avant - normale * v_haut
 
-		var limite := vmax * (R.HERBE if sol == "herbe" else 1.0)
+		var limite := vmax * bonus_vitesse * (R.HERBE if sol == "herbe" else 1.0)
 		if englue > 0.0:
 			limite *= R.JUS_RALENTI
 		if en_toupie:
@@ -398,6 +418,12 @@ func _avancer(dt: float) -> void:
 
 	# Où en est-on sur le tour ?
 	var p: float = piste.courbe.get_closest_offset(ici)
+	sur_raccourci = au_sol and touche["collider"].has_meta("raccourci")
+	if sur_raccourci:
+		# Sur un raccourci, on avance plus vite que la route : on compte la route qu'il remplace.
+		var raccourci: Dictionary = piste.raccourcis[touche["collider"].get_meta("raccourci")]
+		var fait: float = raccourci["courbe"].get_closest_offset(ici) / raccourci["longueur"]
+		p = fposmod(raccourci["de"] + fait * raccourci["remplace"], piste.longueur)
 	var avance := wrapf(p - position_piste, -piste.longueur / 2.0, piste.longueur / 2.0)
 	var perdu := absf(avance) > 15.0 or ici.y < -5.0 or (au_sol and sol == "herbe")
 	if not perdu:
@@ -435,6 +461,13 @@ func _pilote_auto() -> Vector2:
 	var cible: Transform3D = piste.repere(position_piste + 8.0 + absf(vitesse) * 0.35)
 	# Il se décale s'il y a un obstacle devant lui.
 	var voie := cote
+	# Pendant une chasse aux graines, il vise la graine la plus proche devant lui.
+	var plus_pres := 32.0
+	for g in piste.graines:
+		var devant_moi := wrapf(g["distance"] - position_piste, -piste.longueur / 2.0, piste.longueur / 2.0)
+		if g["noeud"].visible and devant_moi > 6.0 and devant_moi < plus_pres:
+			plus_pres = devant_moi
+			voie = g["voie"]
 	var bord: float = piste.largeur / 2.0 - 1.5
 	for o in piste.obstacles:
 		var devant_moi := wrapf(o["distance"] - position_piste, -piste.longueur / 2.0, piste.longueur / 2.0)
@@ -443,6 +476,11 @@ func _pilote_auto() -> Vector2:
 			if absf(voie) > bord:
 				voie = o["voie"] - signf(voie) * 3.8
 	var vers := cible.origin + cible.basis.x * voie - boule.global_position
+	# Avec la patate chaude, il fonce sur le kart le plus proche devant lui.
+	if proie != null and is_instance_valid(proie) and not proie.elimine:
+		var vers_la_proie: Vector3 = proie.ou_suis_je() - boule.global_position
+		if vers_la_proie.length() < 28.0 and devant().dot(vers_la_proie.normalized()) > 0.3:
+			vers = vers_la_proie
 	var ecart := wrapf(atan2(-vers.x, -vers.z) - cap, -PI, PI)
 	var trop_vite := absf(ecart) > 0.6 and vitesse > vmax * 0.6
 	return Vector2(clampf(-ecart * 3.0, -1.0, 1.0), -1.0 if trop_vite else 1.0)

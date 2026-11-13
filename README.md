@@ -53,25 +53,46 @@ trois en gagnant. Les étoiles sont gardées sur l'appareil, et le menu compte l
 Chaque circuit a aussi trois défis à lui, à réussir quand on veut (onglet « Du circuit ») : battre un
 chrono, finir sans toucher d'obstacle, toucher des adversaires avec ses pépins, réussir en avion...
 
+### Les épreuves
+
+Le menu propose cinq façons de jouer :
+
+- **Course** : le premier arrivé gagne.
+- **Élimination** : à la fin de chaque tour, le dernier est éliminé. Le dernier en piste gagne.
+- **Contre-la-montre** : seul sur la piste, contre son record et le fantôme de sa meilleure course.
+- **Chasse aux graines** : deux minutes pour ramasser le plus de graines. Un pépin reçu en fait perdre deux.
+- **Patate chaude** : un pilote porte une patate qui va éclater. Il la refile en touchant un autre kart
+  ou en le touchant avec un pépin. Celui qui l'a quand elle éclate est éliminé.
+
+La chasse aux graines et la patate chaude se jouent en kart seulement. Les noms et les règles sont dans
+`donnees/modes.gd`, les durées dans `donnees/reglages.gd`.
+
+### Les raccourcis
+
+Sur sept circuits, la route fait un détour et un passage étroit coupe tout droit : un panneau
+« RACCOURCI » le signale, et il est en pointillé sur le plan du menu. Il fait gagner du temps, mais un
+obstacle va et vient au milieu. Les raccourcis s'écrivent dans `donnees/circuits.gd`.
+
 ### Le magasin
 
 On gagne des graines en finissant une course (50 pour le premier, 30 pour le deuxième, 20 pour le
 troisième, 10 pour les autres), en réussissant un défi de circuit (100) et en gagnant des étoiles au
 défi du jour (30 par étoile). Le bouton « Magasin » du menu ouvre deux rayons, les voitures et les
-avions. Au début, on a le kart et le monoplan ; les autres s'achètent. Les prix sont dans
+avions (kart, buggy, bolide, tracteur, cagette, moto). Au début, on a le kart et le monoplan ; les autres s'achètent. Les prix sont dans
 `donnees/vehicules.gd`, les gains dans `donnees/reglages.gd`.
 
 Si le kart sort de la piste, il y est reposé au bout de deux secondes.
 
 ## Modifier le jeu
 
-Cinq fichiers sont faits pour être changés. Chacun commence par son mode d'emploi.
+Six fichiers sont faits pour être changés. Chacun commence par son mode d'emploi.
 
 | Fichier | Ce qu'on y change |
 | --- | --- |
-| `donnees/circuits.gd` | Les circuits : la liste des points par où passe la route (avec leur hauteur), les turbos, les tremplins, les cagettes à bonus, la musique |
+| `donnees/circuits.gd` | Les circuits : la liste des points par où passe la route (avec leur hauteur), les turbos, les tremplins, les cagettes à bonus, les obstacles, les raccourcis, la musique |
 | `donnees/pilotes.gd` | Les fruits : nom, forme, motif de la peau, couleurs, vitesse, accélération, maniabilité, modèle 3D |
 | `donnees/vehicules.gd` | Les véhicules : nom, forme, et ce qu'ils ajoutent ou enlèvent en vitesse, accélération, maniabilité |
+| `donnees/modes.gd` | Les épreuves : leur nom et leur règle |
 | `donnees/defis.gd` | Les règles spéciales des défis du jour, et les défis des circuits |
 | `donnees/reglages.gd` | Le titre, la gravité, l'adhérence, le turbo, le saut, les bonus, le volume de la musique, le niveau des ordinateurs, le nombre de karts, les nombres de tours proposés, le décor, les couleurs |
 

@@ -17,6 +17,8 @@
 #    bonus      pareil pour les rangées de cagettes à bonus
 #    obstacles  où poser les obstacles (si on n'écrit rien : 0.3, 0.5, 0.7 et 0.9).
 #               Une fois sur deux ils ne bougent pas, sinon ils traversent la route.
+#    raccourcis des passages étroits qui coupent tout droit : [où il commence, où il finit].
+#               Il faut que la route fasse un détour entre les deux, sinon on ne gagne rien.
 #    musique    le fichier de musique du circuit, dans le dossier musique/
 #    defis      les trois défis du circuit (si on n'écrit rien, le jeu en choisit trois).
 #               Les défis possibles sont dans donnees/defis.gd.
@@ -38,6 +40,7 @@ const CIRCUITS := [
 		"turbos": [0.04, 0.6],
 		"tremplins": [0.64],
 		"bonus": [0.15, 0.4, 0.85],
+		"raccourcis": [[0.455, 0.796]],
 		"musique": "res://musique/course-1.mp3",
 		"points": [
 			Vector3(0, 0, 0),
@@ -46,7 +49,7 @@ const CIRCUITS := [
 			Vector3(160, 8, -30),
 			Vector3(160, 8, -85),
 			Vector3(115, 3, -115),
-			Vector3(60, 0, -115),
+			Vector3(60, 0, -160),  # le détour : la route fait le tour, le raccourci coupe tout droit
 			Vector3(0, 0, -115),
 			Vector3(-45, 0, -85),
 			Vector3(-45, 0, -30),
@@ -112,6 +115,7 @@ const CIRCUITS := [
 		"turbos": [0.03],
 		"tremplins": [],
 		"bonus": [0.15, 0.5, 0.8],
+		"raccourcis": [[0.363, 0.588]],
 		"musique": "res://musique/montagne.ogg",
 		"points": [
 			Vector3(119, 0, 0),
@@ -122,7 +126,7 @@ const CIRCUITS := [
 			Vector3(-45, 16.6, 83),
 			Vector3(-81, 20.5, 62),
 			Vector3(-92, 23.1, 29),
-			Vector3(-91, 24, 0),
+			Vector3(-136, 24, 0),  # le détour : la route fait le tour, le raccourci coupe tout droit
 			Vector3(-92, 23.1, -29),
 			Vector3(-81, 20.5, -62),
 			Vector3(-45, 16.6, -83),
@@ -140,6 +144,7 @@ const CIRCUITS := [
 		"turbos": [0.05, 0.5],
 		"tremplins": [],
 		"bonus": [0.2, 0.6, 0.85],
+		"raccourcis": [[0.531, 0.813]],
 		"musique": "res://musique/grotte.ogg",
 		"points": [
 			Vector3(114, 3, 0),
@@ -153,7 +158,7 @@ const CIRCUITS := [
 			Vector3(-114, 3, 0),
 			Vector3(-92, 5.1, -24),
 			Vector3(-61, 6, -38),
-			Vector3(-38, 5.1, -57),
+			Vector3(-59, 5.1, -97),  # le détour : la route fait le tour, le raccourci coupe tout droit
 			Vector3(0, 3, -71),
 			Vector3(38, 0.9, -57),
 			Vector3(61, 0, -38),
@@ -168,6 +173,7 @@ const CIRCUITS := [
 		"turbos": [0.1, 0.6],
 		"tremplins": [],
 		"bonus": [0.25, 0.5, 0.85],
+		"raccourcis": [[0.404, 0.78]],
 		"musique": "res://musique/pizza.ogg",
 		"points": [
 			Vector3(87, 0, 0),
@@ -179,7 +185,7 @@ const CIRCUITS := [
 			Vector3(-71, 5.2, 51),
 			Vector3(-72, 2.5, 15),
 			Vector3(-72, 0.4, -15),
-			Vector3(-71, 0, -51),
+			Vector3(-99, 0, -72),  # le détour : la route fait le tour, le raccourci coupe tout droit
 			Vector3(-37, 0, -63),
 			Vector3(-8, 0, -73),
 			Vector3(27, 0, -83),
@@ -195,6 +201,7 @@ const CIRCUITS := [
 		"turbos": [0.06, 0.55],
 		"tremplins": [],
 		"bonus": [0.2, 0.45, 0.8],
+		"raccourcis": [[0.481, 0.764]],
 		"musique": "res://musique/aquarium.ogg",
 		"points": [
 			Vector3(105, 0, 26),
@@ -208,7 +215,7 @@ const CIRCUITS := [
 			Vector3(-105, 0, 26),
 			Vector3(-97, 0.9, -1),
 			Vector3(-74, 3, -35),
-			Vector3(-40, 5.1, -65),
+			Vector3(-62, 5.1, -104),  # le détour : la route fait le tour, le raccourci coupe tout droit
 			Vector3(0, 6, -76),
 			Vector3(40, 5.1, -65),
 			Vector3(74, 3, -35),
@@ -223,6 +230,7 @@ const CIRCUITS := [
 		"turbos": [0.05],
 		"tremplins": [],
 		"bonus": [0.2, 0.5, 0.8],
+		"raccourcis": [[0.292, 0.598]],
 		"musique": "res://musique/frigo.ogg",
 		"points": [
 			Vector3(0, 0, 55),
@@ -232,7 +240,7 @@ const CIRCUITS := [
 			Vector3(-92, 0, 0),
 			Vector3(-88, 0, -31),
 			Vector3(-75, 0, -45),
-			Vector3(-52, 0, -52),
+			Vector3(-58, 0, -97),  # le détour : la route fait le tour, le raccourci coupe tout droit
 			Vector3(0, 0, -55),
 			Vector3(52, 0, -52),
 			Vector3(75, 0, -45),
@@ -251,6 +259,7 @@ const CIRCUITS := [
 		"turbos": [0.05, 0.5],
 		"tremplins": [],
 		"bonus": [0.15, 0.4, 0.7],
+		"raccourcis": [[0.327, 0.612]],
 		"musique": "res://musique/potager.ogg",
 		"points": [
 			Vector3(70, 2.1, 34),
@@ -260,7 +269,7 @@ const CIRCUITS := [
 			Vector3(-54, 2.6, 70),
 			Vector3(-68, 2.4, 37),
 			Vector3(-62, 0.2, 7),
-			Vector3(-64, 0.9, -17),
+			Vector3(-109, 0.9, -14),  # le détour : la route fait le tour, le raccourci coupe tout droit
 			Vector3(-66, 2.9, -51),
 			Vector3(-41, 1.8, -77),
 			Vector3(-2, 0, -71),

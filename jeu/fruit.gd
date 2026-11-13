@@ -33,8 +33,8 @@ static func _kart(kart: Node3D, couleur: Color, forme: String) -> void:
 	var metal := _metal()
 	var bois := _bois()
 
-	# Ce que tous les véhicules ont : le plancher, le siège et le volant.
-	_ajouter(kart, _boite(Vector3(1.15, 0.12, 2.6)), sombre, Vector3(0, 0.3, 0))
+	# Ce que tous les véhicules ont : le plancher (étroit sur une moto), le siège et le volant.
+	_ajouter(kart, _boite(Vector3(0.45 if forme == "moto" else 1.15, 0.12, 2.6)), sombre, Vector3(0, 0.3, 0))
 	_ajouter(kart, _boite(Vector3(0.85, 0.8, 0.14)), cuir, Vector3(0, 0.78, 0.82)).rotation_degrees.x = -12
 	_membre(kart, Vector3(0, 0.55, -0.6), Vector3(0, 0.95, -0.25), 0.04, metal)
 	var cercle := TorusMesh.new()
@@ -80,6 +80,18 @@ static func _kart(kart: Node3D, couleur: Color, forme: String) -> void:
 				_ajouter(kart, _boite(Vector3(0.5, 0.08, 1.5)), peinture, Vector3(x, 1.4, 0.7))  # les garde-boue
 			_ajouter(kart, _boite(Vector3(1.0, 0.5, 0.5)), peinture, Vector3(0, 0.6, 1.2))
 			_ajouter(kart, _boule(0.14), _matiere(Color("#ffb300")), Vector3(0, 1.3, 1.0))  # le gyrophare
+		"moto":
+			# Deux grosses roues l'une derrière l'autre, un réservoir, une fourche, un guidon et un pot.
+			roues = [0.5, 0.5, 0.3, 0.0, -1.35, 1.25]
+			var reservoir := _ajouter(kart, _capsule(0.36, 1.3), rayee, Vector3(0, 0.62, -0.55))
+			reservoir.rotation_degrees.x = 90
+			_ajouter(kart, _boite(Vector3(0.5, 0.45, 0.8)), metal, Vector3(0, 0.45, 0.35))  # le moteur
+			for x: float in [-0.2, 0.2]:
+				_membre(kart, Vector3(x, 0.5, -1.35), Vector3(x, 1.15, -0.85), 0.05, metal)  # la fourche
+			_membre(kart, Vector3(-0.55, 1.15, -0.8), Vector3(0.55, 1.15, -0.8), 0.045, sombre)  # le guidon
+			_ajouter(kart, _boule(0.17), _matiere(Color("#fff59d")), Vector3(0, 1.0, -1.2))  # le phare
+			_ajouter(kart, _boite(Vector3(0.4, 0.08, 0.9)), peinture, Vector3(0, 1.08, 1.25))  # le garde-boue arrière
+			_membre(kart, Vector3(0.3, 0.4, 0.5), Vector3(0.36, 0.55, 1.7), 0.08, metal)  # le pot d'échappement
 		"cagette":
 			roues = [0.3, 0.3, 0.12, 0.8, -0.95, 0.85]
 			# Une caisse en bois : deux planches de chaque côté, une devant, une derrière.
@@ -193,6 +205,11 @@ static func _avion(avion: Node3D, couleur: Color, forme: String) -> void:
 				_membre(avion, Vector3(x * 0.7, 0.5, 0.6), Vector3(x * 1.6, 2.85, 0.1), 0.06, metal)
 				_membre(avion, Vector3(x * 0.6, 0.3, -0.6), Vector3(x, -0.3, -0.7), 0.06, metal)
 				_ajouter(avion, _roue(0.38, 0.25), _matiere(Color("#1c1c1f")), Vector3(x * 1.15, -0.35, -0.7)).rotation_degrees.z = 90
+		"moto":
+			# La moto volante : deux petites ailes courtes et relevées, et une grande hélice.
+			for cote: float in [-1.0, 1.0]:
+				_ajouter(avion, _boite(Vector3(2.6, 0.1, 1.1)), peinture, Vector3(cote * 1.7, 0.75, 0.0)).rotation.z = cote * 0.35
+				_ajouter(avion, _boite(Vector3(0.1, 0.7, 1.1)), sombre, Vector3(cote * 2.9, 1.45, 0.0))
 		"cagette":
 			# Le planeur en bois : de très longues ailes fines, pas d'hélice.
 			helice = false

@@ -33,6 +33,10 @@ func placer(distance_piste: float, decalage: float) -> void:
 	position_piste = fposmod(distance_piste, piste.longueur)
 
 
+func _ranger() -> void:
+	ou = Vector3(0, -1000, 0)
+
+
 func ou_suis_je() -> Vector3:
 	return ou
 
@@ -57,7 +61,7 @@ func _avancer(dt: float) -> void:
 	turbo = maxf(0.0, turbo - dt)
 
 	# La vitesse : l'avion avance tout seul. Le bouton du dérapage sert de frein.
-	var limite := vmax if actif else 0.0
+	var limite := vmax * bonus_vitesse if actif else 0.0
 	if turbo > 0.0:
 		limite *= R.TURBO_FORCE
 	if englue > 0.0:

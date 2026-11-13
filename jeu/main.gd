@@ -6,6 +6,7 @@ const Circuits = preload("res://donnees/circuits.gd")
 const Pilotes = preload("res://donnees/pilotes.gd")
 const Vehicules = preload("res://donnees/vehicules.gd")
 const Defis = preload("res://donnees/defis.gd")
+const Modes = preload("res://donnees/modes.gd")
 const Course = preload("res://jeu/course.gd")
 const Decor = preload("res://jeu/decor.gd")
 const Fruit = preload("res://jeu/fruit.gd")
@@ -23,7 +24,7 @@ const DISCRET := Color("#9aa6c7")
 
 var GRAS := FontVariation.new()  # la police des titres, en plus épais
 
-var choix := {"joueurs": 1, "pilotes": [0, 1], "vehicules": [0, 0], "circuit": 0, "tours": 3, "avions": false, "onglet": 0}
+var choix := {"joueurs": 1, "pilotes": [0, 1], "vehicules": [0, 0], "circuit": 0, "tours": 3, "avions": false, "onglet": 0, "epreuve": 0}
 var menu: Control
 var resultats: Control
 var course: Node
@@ -40,6 +41,7 @@ var capture := ""
 var essai_derapage := ""
 var essai_bonus := ""
 var essai_trace := 0.0
+var essai_raccourci := ""
 var musique := AudioStreamPlayer.new()
 
 
@@ -82,6 +84,10 @@ func _ready() -> void:
 			choix["vehicules"] = [int(option.trim_prefix("--vehicule=")), int(option.trim_prefix("--vehicule="))]
 		elif option.begins_with("--circuit="):
 			choix["circuit"] = int(option.trim_prefix("--circuit="))
+		elif option.begins_with("--essai-raccourci="):
+			essai_raccourci = option.trim_prefix("--essai-raccourci=")
+		elif option.begins_with("--epreuve="):
+			choix["epreuve"] = int(option.trim_prefix("--epreuve="))
 		elif option == "--magasin":
 			au_magasin = true
 			rayon_avions = choix["avions"]
@@ -95,6 +101,11 @@ func _ready() -> void:
 		_simuler()
 	elif capture != "":
 		_lancer(true)
+	elif essai_raccourci != "":
+		# Le joueur 1 est posé à l'entrée du premier raccourci et roule tout droit.
+		_lancer(false)
+		course.scenario = func(_t: float) -> Array:
+			return [Vector2(0.0, 1.0), [false, false, false, false]]
 	elif essai_bonus != "":
 		_lancer(false)
 		# Le joueur 1 roule tout droit, saute à 1 s, puis tire et utilise son objet sans arrêt.
@@ -134,11 +145,17 @@ func _montrer_menu() -> void:
 		marge.add_theme_constant_override("margin_" + cote, 18)
 	menu.add_child(marge)
 	var page := VBoxContainer.new()
-	page.add_theme_constant_override("separation", 14)
+	page.add_theme_constant_override("separation", 10)
 	marge.add_child(page)
 	if au_magasin:
 		_montrer_le_magasin(page)
 		return
+	# Certaines épreuves ne se jouent qu'en kart, ou qu'à un seul joueur.
+	var epreuve: Dictionary = Modes.EPREUVES[choix["epreuve"]]
+	if not epreuve["avions"]:
+		choix["avions"] = false
+	if epreuve["seul"]:
+		choix["joueurs"] = 1
 	# Si le véhicule choisi n'est pas (ou plus) dans le garage, on reprend le premier.
 	for j in 2:
 		if not Magasin.possede(choix["vehicules"][j], choix["avions"]):
@@ -160,6 +177,16 @@ func _montrer_menu() -> void:
 	_reglette(entete, "Mode", ["Karts", "Avions"], 1 if choix["avions"] else 0, func(i): choix["avions"] = i == 1)
 	_reglette(entete, "Joueurs", ["1", "2"], choix["joueurs"] - 1, func(i): choix["joueurs"] = i + 1)
 	_reglette(entete, "Tours", R.CHOIX_DE_TOURS.map(func(t): return str(t)), R.CHOIX_DE_TOURS.find(choix["tours"]), func(i): choix["tours"] = R.CHOIX_DE_TOURS[i])
+
+	# Juste dessous : l'épreuve, et sa règle.
+	var ligne := HBoxContainer.new()
+	ligne.add_theme_constant_override("separation", 16)
+	page.add_child(ligne)
+	_reglette(ligne, "Épreuve", Modes.EPREUVES.map(func(e): return e["nom"]), choix["epreuve"], func(i): choix["epreuve"] = i)
+	var regle := _texte(ligne, epreuve["texte"] + ("" if epreuve["avions"] else " (En kart seulement.)"), 14, DISCRET)
+	regle.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	regle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	regle.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 
 	# Au milieu : une carte par joueur, puis le circuit et le défi du jour.
 	var corps := HBoxContainer.new()
@@ -300,7 +327,7 @@ func _montrer_le_magasin(page: Control) -> void:
 	entete.add_child(retour)
 
 	var rayon := HBoxContainer.new()
-	rayon.add_theme_constant_override("separation", 12)
+	rayon.add_theme_constant_override("separation", 8)
 	rayon.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	page.add_child(rayon)
 	var pilote: Dictionary = Pilotes.PILOTES[choix["pilotes"][0]]
@@ -320,14 +347,18 @@ func _montrer_le_magasin(page: Control) -> void:
 			a_nous.add_theme_color_override("font_disabled_color", JAUNE)
 			a_nous.add_theme_stylebox_override("disabled", a_nous.get_theme_stylebox("normal"))
 			carte.add_child(a_nous)
+		else:
+			_texte(carte, "%d graines" % prix, 16, JAUNE, true).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		if Magasin.possede(numero, rayon_avions):
+			pass
 		elif graines >= prix:
-			var acheter := _bouton("Acheter : %d" % prix, ACCENT, Color.WHITE, 16)
+			var acheter := _bouton("Acheter", ACCENT, Color.WHITE, 16)
 			acheter.pressed.connect(func():
 				Magasin.acheter(numero, rayon_avions)
 				_montrer_menu())
 			carte.add_child(acheter)
 		else:
-			var trop_cher := _bouton("%d  (il manque %d)" % [prix, prix - graines], CARTE_CLAIRE, DISCRET, 15)
+			var trop_cher := _bouton("Il manque %d" % (prix - graines), CARTE_CLAIRE, DISCRET, 14)
 			trop_cher.disabled = true
 			trop_cher.add_theme_color_override("font_disabled_color", DISCRET)
 			trop_cher.add_theme_stylebox_override("disabled", trop_cher.get_theme_stylebox("normal"))
@@ -342,7 +373,7 @@ func _carte_du_circuit(parent: Control) -> void:
 	var carte := _carte(parent, "Circuit")
 	carte.get_parent().size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var circuit: Dictionary = Circuits.CIRCUITS[choix["circuit"]]
-	var longueur := _plan(carte, circuit, Vector2(330, 150) if choix["joueurs"] == 1 else Vector2(300, 96))
+	var longueur := _plan(carte, circuit, Vector2(330, 120) if choix["joueurs"] == 1 else Vector2(300, 56))
 	var nombre := Circuits.CIRCUITS.size()
 	_selecteur(carte, circuit["nom"], TEXTE, 22,
 		func(): choix["circuit"] = (choix["circuit"] + nombre - 1) % nombre,
@@ -384,6 +415,19 @@ func _plan(parent: Control, circuit: Dictionary, taille: Vector2) -> int:
 		ligne.joint_mode = Line2D.LINE_JOINT_ROUND
 		ligne.antialiased = true
 		fond.add_child(ligne)
+	# Les raccourcis, en pointillé.
+	var tour := courbe.get_baked_length()
+	for bouts in circuit.get("raccourcis", []):
+		var de := courbe.sample_baked(float(bouts[0]) * tour)
+		var a := courbe.sample_baked(float(bouts[1]) * tour)
+		for k in range(1, 10, 2):
+			var pointille := Line2D.new()
+			pointille.points = PackedVector2Array([
+				(Vector2(de.x, de.z).lerp(Vector2(a.x, a.z), k / 10.0) - zone.get_center()) * echelle + taille / 2.0,
+				(Vector2(de.x, de.z).lerp(Vector2(a.x, a.z), (k + 1) / 10.0) - zone.get_center()) * echelle + taille / 2.0])
+			pointille.width = 3.0
+			pointille.default_color = Color(ambiance["lignes"][1])
+			fond.add_child(pointille)
 	var depart := ColorRect.new()
 	depart.color = Color.WHITE
 	depart.size = Vector2(8, 8)
@@ -600,10 +644,21 @@ func _lancer(demo: bool) -> void:
 	var en_avion: bool = defi["avions"] if not defi.is_empty() else choix["avions"]
 	var vehicules: Array = choix["vehicules"].map(func(v): return v if Magasin.possede(v, en_avion) else 0)
 	if defi.is_empty():
-		course.demarrer(circuit, humains, vehicules, choix["tours"], en_avion)
+		var sorte: String = Modes.EPREUVES[choix["epreuve"]]["cle"]
+		if sorte == "chrono":
+			# Contre-la-montre : on retrouve le record de ce circuit et son fantôme.
+			var ancien: Dictionary = Defi.record(_cle_du_record())
+			course.record = float(ancien.get("temps", -1.0))
+			course.fantome = ancien.get("trace", [])
+		course.demarrer(circuit, humains, vehicules, choix["tours"], en_avion, "", sorte)
 	else:
 		course.demarrer(circuit, humains, vehicules, defi["tours"], en_avion, defi["regle"]["effet"])
 	_jouer(circuit.get("musique", ""))
+
+
+# Un record par circuit, par mode (kart ou avion) et par nombre de tours.
+func _cle_du_record() -> String:
+	return "%s / %s / %d tours" % [Circuits.CIRCUITS[choix["circuit"]]["nom"], "avion" if choix["avions"] else "kart", choix["tours"]]
 
 
 func _montrer_resultats(classement: Array) -> void:
@@ -638,12 +693,30 @@ func _montrer_resultats(classement: Array) -> void:
 		var couleur := JAUNE if r["humain"] else TEXTE
 		_texte(ligne, "%d" % (i + 1), 22, DISCRET, true).custom_minimum_size.x = 26
 		_texte(ligne, r["nom"], 22, couleur, r["humain"]).size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		_texte(ligne, "%.1f s" % r["temps"] if r["temps"] >= 0.0 else "—", 20, couleur)
+		var detail: String = r.get("detail", "")
+		if detail == "" or detail == "gagnant":
+			detail = "%.1f s" % r["temps"] if r["temps"] >= 0.0 else "—"
+		_texte(ligne, detail, 20, couleur)
 
 	# Les graines : selon la place, et plus pour une course plus longue.
 	var graines := 0
-	if place > 0 and not en_demo and joueur["temps"] >= 0.0:
+	var sorte: String = course.epreuve if course != null else "course"
+	if place > 0 and not en_demo and sorte == "chrono":
+		# Contre-la-montre : on compare au record, et on garde la course si elle est meilleure.
+		if joueur["temps"] >= 0.0:
+			graines = R.GRAINES_CHRONO[0]
+			var bat_le_record: bool = course.record < 0.0 or joueur["temps"] < course.record
+			if bat_le_record:
+				graines += R.GRAINES_CHRONO[1] if course.record > 0.0 else 0
+				Defi.noter_le_record(_cle_du_record(), joueur["temps"], course.trace)
+			_texte(carte, "Nouveau record !" if bat_le_record else "Ton record : %.1f s" % course.record, 18, JAUNE if bat_le_record else DISCRET, true)
+	elif place > 0 and not en_demo and sorte == "chasse":
+		# Chasse aux graines : on garde ce qu'on a ramassé, plus la prime du classement.
+		graines = int(joueur.get("score", 0)) + R.GRAINES_PAR_PLACE[mini(place, R.GRAINES_PAR_PLACE.size()) - 1]
+	elif place > 0 and not en_demo and (joueur["temps"] >= 0.0 or sorte != "course"):
 		var tours: int = defi["tours"] if not defi.is_empty() else choix["tours"]
+		if sorte != "course":
+			tours = 3
 		graines = int(R.GRAINES_PAR_PLACE[mini(place, R.GRAINES_PAR_PLACE.size()) - 1] * tours / 3.0)
 
 	# Le défi du jour : on gagne une, deux ou trois étoiles.
@@ -695,9 +768,30 @@ func _process(dt: float) -> void:
 	for plateau in tournants:
 		if is_instance_valid(plateau):
 			plateau.rotation.y = angle
-	if capture != "" and essai_derapage == "" and essai_bonus == "" and course != null and course.temps > 4.0:
+	if capture != "" and essai_derapage == "" and essai_bonus == "" and essai_raccourci == "" and course != null and course.temps > 4.0:
 		get_viewport().get_texture().get_image().save_png(capture)
 		get_tree().quit()
+	if essai_raccourci != "" and course != null and not course.piste.raccourcis.is_empty():
+		var kart = course.vues[0]["kart"]
+		var raccourci: Dictionary = course.piste.raccourcis[0]
+		if course.temps >= 0.5 and capture == "":
+			capture = "pose"
+			var entree: Transform3D = course.piste._repere_de(raccourci["courbe"], raccourci["longueur"] * 0.25)
+			kart.placer(0.0, 0.0)
+			kart.boule.position = entree.origin + Vector3.UP
+			PhysicsServer3D.body_set_state(kart.boule.get_rid(), PhysicsServer3D.BODY_STATE_TRANSFORM, Transform3D(Basis.IDENTITY, entree.origin + Vector3.UP))
+			kart.cap = atan2(entree.basis.z.x, entree.basis.z.z)
+			kart.position_piste = raccourci["de"] + 0.25 * raccourci["remplace"]
+			kart.distance = kart.position_piste
+			print("raccourci de %.0f m qui remplace %.0f m de route, de %.0f à %.0f" % [raccourci["longueur"], raccourci["remplace"], raccourci["de"], raccourci["de"] + raccourci["remplace"]])
+		if course.temps >= essai_trace:
+			essai_trace += 0.5
+			print("t=%.1f position sur le tour=%.0f distance=%.0f vitesse=%.0f retours=%d touches=%d" % [course.temps, kart.position_piste, kart.distance, kart.vitesse, kart.retours, kart.touches])
+		if course.temps > 2.0 and capture == "pose":
+			capture = "fait"
+			get_viewport().get_texture().get_image().save_png(essai_raccourci)
+		if course.temps > 9.0:
+			get_tree().quit()
 	if essai_bonus != "" and course != null:
 		var kart = course.vues[0]["kart"]
 		if course.temps >= essai_trace:
@@ -748,7 +842,7 @@ func _simuler() -> void:
 		return
 	course = Course.new()
 	add_child(course)
-	course.demarrer(Circuits.CIRCUITS[essai_circuit], [], [], 0, choix["avions"])
+	course.demarrer(Circuits.CIRCUITS[essai_circuit], [], [], 0, choix["avions"], "", Modes.EPREUVES[choix["epreuve"]]["cle"])
 	print("%s : %.0f m par tour, %d tours" % [Circuits.CIRCUITS[essai_circuit]["nom"], course.piste.longueur, course.piste.tours])
 	course.finie.connect(func(classement: Array):
 		for r in classement:

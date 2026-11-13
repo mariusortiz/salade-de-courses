@@ -33,13 +33,25 @@ var scenario := Callable()  # pour les essais : remplace le clavier du joueur 1
 var pepins: Array = []   # les pépins en vol
 var flaques: Array = []  # les flaques de jus sur la route
 var aerien := false      # true = le mode Avions
+var epreuve := "course"  # la façon de jouer (voir donnees/modes.gd)
+var sortis: Array = []   # les karts éliminés, dans l'ordre
+var manche := 1          # Élimination : le numéro du tour en cours
+var patate := {}         # Patate chaude : qui la porte, quand elle éclate
+var patate_visible: MeshInstance3D
+var prochaine_patate := 3.0
+var trace: Array = []    # Contre-la-montre : la course du joueur, notée dix fois par seconde
+var fantome: Array = []  # Contre-la-montre : la trace de sa meilleure course
+var fantome_visible: Node3D
+var record := -1.0
 
 
 # humains : les numéros des pilotes des joueurs. vehicules : le numéro du véhicule de chacun.
 # tours : 0 = le nombre de tours écrit dans le circuit.
 # en_avion : true = le mode Avions. regle : l'effet du défi du jour ("" = aucun).
-func demarrer(circuit: Dictionary, humains: Array, vehicules: Array = [], tours := 0, en_avion := false, regle := "") -> void:
+# sorte : l'épreuve ("course", "elimination", "chrono", "chasse" ou "patate").
+func demarrer(circuit: Dictionary, humains: Array, vehicules: Array = [], tours := 0, en_avion := false, regle := "", sorte := "course") -> void:
 	aerien = en_avion
+	epreuve = sorte
 	piste = Piste.new()
 	piste.regle = regle
 	add_child(piste)
@@ -52,6 +64,8 @@ func demarrer(circuit: Dictionary, humains: Array, vehicules: Array = [], tours 
 	var autres: Array = range(Pilotes.PILOTES.size()).filter(func(i): return not humains.has(i))
 	autres.shuffle()
 	var grille: Array = []
+	if epreuve == "chrono" and not humains.is_empty():
+		autres = []  # contre la montre, on est seul sur la piste
 	for i in autres.slice(0, maxi(0, R.NOMBRE_DE_KARTS - humains.size())):
 		grille.append([i, false, Vehicules.VEHICULES.pick_random()])
 	for j in humains.size():
@@ -73,6 +87,8 @@ func demarrer(circuit: Dictionary, humains: Array, vehicules: Array = [], tours 
 		kart.tire.connect(_lancer_un_pepin)
 		kart.verse.connect(_verser_du_jus)
 		karts.append(kart)
+
+	_preparer_l_epreuve()
 
 	# Un écran par joueur, l'un au-dessus de l'autre.
 	var ecran := VBoxContainer.new()
@@ -212,14 +228,184 @@ func _physics_process(dt: float) -> void:
 			kart.arrivee = temps
 			kart.auto = true  # après l'arrivée, l'ordinateur fait le tour d'honneur
 
-	# La course s'arrête quand tous les joueurs sont arrivés.
+	# Chaque épreuve a sa règle, et sa façon de finir.
+	var vivants := karts.filter(func(k): return not k.elimine)
 	var attendus := karts.filter(func(k): return k.humain) if not vues.is_empty() else karts
-	if fin < 0.0 and (attendus.all(func(k): return k.arrivee >= 0.0) or temps > 600.0):
+	var terminee := false
+	match epreuve:
+		"elimination", "patate":
+			if epreuve == "elimination":
+				_eliminer_le_dernier(vivants)
+			else:
+				_faire_tourner_la_patate(vivants)
+			vivants = karts.filter(func(k): return not k.elimine)
+			if vivants.size() == 1 and vivants[0].arrivee < 0.0:
+				vivants[0].arrivee = temps  # le dernier en piste a gagné
+			# C'est fini quand il ne reste qu'un kart, ou quand tous les joueurs sont éliminés.
+			terminee = vivants.size() <= 1 or not attendus.any(func(k): return not k.elimine)
+		"chasse":
+			_ramasser_les_graines()
+			terminee = temps >= R.CHASSE_DUREE
+		_:
+			if epreuve == "chrono":
+				_suivre_le_fantome()
+			terminee = attendus.all(func(k): return k.arrivee >= 0.0)
+	if fin < 0.0 and (terminee or temps > 600.0):
 		fin = temps
 	if fin >= 0.0 and temps > fin + 2.5 and not annoncee:
 		annoncee = true
 		finie.emit(classement().map(func(k): return {"nom": k.pilote["nom"], "temps": k.arrivee, "humain": k.humain,
-			"touches": k.touches, "retours": k.retours, "tirs": k.tirs, "cagettes": k.cagettes, "glisses": k.glisses}))
+			"touches": k.touches, "retours": k.retours, "tirs": k.tirs, "cagettes": k.cagettes, "glisses": k.glisses,
+			"score": k.score, "detail": _detail(k)}))
+
+
+# ── Les épreuves ─────────────────────────────────────────────
+
+func _preparer_l_epreuve() -> void:
+	match epreuve:
+		"elimination":
+			piste.tours = maxi(1, karts.size() - 1)  # un éliminé par tour
+		"chasse":
+			piste.tours = 999
+			for i in R.CHASSE_GRAINES:
+				piste.semer()
+		"patate":
+			piste.tours = 999
+			for kart in karts:
+				kart.pepins = R.PATATE_PEPINS
+			var forme := SphereMesh.new()
+			forme.radius = 0.7
+			forme.height = 1.4
+			patate_visible = MeshInstance3D.new()
+			patate_visible.mesh = forme
+			patate_visible.material_override = StandardMaterial3D.new()
+			patate_visible.material_override.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			patate_visible.visible = false
+			add_child(patate_visible)
+		"chrono":
+			if not fantome.is_empty():
+				# Le fantôme : une silhouette blanche qui refait la meilleure course.
+				var brume := StandardMaterial3D.new()
+				brume.albedo_color = Color(1, 1, 1, 0.45)
+				brume.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+				brume.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+				fantome_visible = Node3D.new()
+				add_child(fantome_visible)
+				for partie in [[1.0, Vector3(0, 0.6, 0), Vector3(1.0, 0.5, 1.8)], [0.75, Vector3(0, 1.5, 0.2), Vector3.ONE]]:
+					var forme := SphereMesh.new()
+					forme.radius = partie[0]
+					forme.height = partie[0] * 2.0
+					var m := MeshInstance3D.new()
+					m.mesh = forme
+					m.material_override = brume
+					m.position = partie[1]
+					m.scale = partie[2]
+					fantome_visible.add_child(m)
+
+
+# Ce qu'on écrit à côté du nom dans le classement, quand ce n'est pas un temps.
+func _detail(kart: Node3D) -> String:
+	match epreuve:
+		"chasse":
+			return "%d graine%s" % [kart.score, "s" if kart.score > 1 else ""]
+		"elimination", "patate":
+			return "éliminé" if kart.elimine else "gagnant"
+	return ""
+
+
+func _sortir(kart: Node3D) -> void:
+	sortis.append(kart)
+	kart.eliminer()
+
+
+# Élimination : dès que tous les karts sauf un ont fini le tour, celui qui reste est éliminé.
+func _eliminer_le_dernier(vivants: Array) -> void:
+	if vivants.size() <= 1:
+		return
+	var passes := vivants.filter(func(k): return k.distance >= manche * piste.longueur)
+	if passes.size() >= vivants.size() - 1:
+		var dernier: Node3D = vivants[0]
+		for k in vivants:
+			if k.distance < dernier.distance:
+				dernier = k
+		_sortir(dernier)
+		manche += 1
+
+
+# Chasse aux graines : une graine ramassée repousse ailleurs.
+func _ramasser_les_graines() -> void:
+	for graine in piste.graines:
+		for kart in karts:
+			if kart.ou_suis_je().distance_to(graine["noeud"].position) < 2.0:
+				kart.score += 1
+				piste.semer(graine)
+				break
+
+
+# Patate chaude : le porteur la refile en touchant un autre kart. Quand elle éclate, il est éliminé.
+func _faire_tourner_la_patate(vivants: Array) -> void:
+	if vivants.size() <= 1:
+		patate_visible.visible = false
+		return
+	if patate.is_empty():
+		if temps >= prochaine_patate:
+			_donner_la_patate(vivants.pick_random(), null)
+			patate["eclate"] = temps + randf_range(R.PATATE_DUREE[0], R.PATATE_DUREE[1])
+		return
+	var porteur: Node3D = patate["porteur"]
+	# Il faut garder la patate au moins une seconde, et on ne la rend pas tout de suite à celui qui l'a donnée.
+	if temps > patate["recue"] + 1.0:
+		for k in vivants:
+			var rendue: bool = k == patate["donneur"] and temps < patate["recue"] + 3.0
+			if k != porteur and not rendue and k.ou_suis_je().distance_to(porteur.ou_suis_je()) < 2.8:
+				_donner_la_patate(k, porteur)
+				break
+	porteur = patate["porteur"]
+	# L'ordinateur qui a la patate poursuit le kart le plus proche.
+	var plus_pres := INF
+	for k in vivants:
+		k.bonus_vitesse = R.PATATE_VITESSE if k == porteur else 1.0
+		k.proie = null
+		if k != porteur and k.ou_suis_je().distance_to(porteur.ou_suis_je()) < plus_pres:
+			plus_pres = k.ou_suis_je().distance_to(porteur.ou_suis_je())
+			porteur.proie = k
+	# La patate flotte au-dessus du porteur. Plus elle est près d'éclater, plus elle est rouge et plus elle bat vite.
+	var reste: float = patate["eclate"] - temps
+	var chaleur := clampf(1.0 - reste / R.PATATE_DUREE[1], 0.0, 1.0)
+	patate_visible.visible = true
+	patate_visible.position = porteur.ou_suis_je() + Vector3.UP * 3.2
+	patate_visible.scale = Vector3(1.3, 1.0, 1.0) * (1.0 + 0.2 * sin(temps * (6.0 + 20.0 * chaleur)))
+	patate_visible.material_override.albedo_color = Color("#b58a4c").lerp(Color("#ff1744"), chaleur)
+	if reste <= 0.0:
+		_sortir(porteur)
+		patate = {}
+		patate_visible.visible = false
+		prochaine_patate = temps + 2.0
+
+
+func _donner_la_patate(a_qui: Node3D, de_qui: Node3D) -> void:
+	patate["porteur"] = a_qui
+	patate["donneur"] = de_qui
+	patate["recue"] = temps
+	a_qui.annonce = "Tu as la patate !"
+	a_qui.annonce_temps = 2.0
+
+
+# Contre-la-montre : on note la course du joueur, et le fantôme refait la meilleure.
+func _suivre_le_fantome() -> void:
+	if vues.is_empty():
+		return
+	var kart: Node3D = vues[0]["kart"]
+	if kart.arrivee < 0.0 and trace.size() <= int(temps * 10.0):
+		var ici: Vector3 = kart.ou_suis_je()
+		trace.append([snappedf(ici.x, 0.01), snappedf(ici.y, 0.01), snappedf(ici.z, 0.01), snappedf(kart.cap, 0.001)])
+	if fantome_visible != null:
+		var rang := temps * 10.0
+		var a: Array = fantome[mini(int(rang), fantome.size() - 1)]
+		var b: Array = fantome[mini(int(rang) + 1, fantome.size() - 1)]
+		var entre := rang - floorf(rang)
+		fantome_visible.position = Vector3(a[0], a[1], a[2]).lerp(Vector3(b[0], b[1], b[2]), entre) + Vector3.DOWN * 0.9
+		fantome_visible.rotation.y = lerp_angle(a[3], b[3], entre)
 
 
 func _commander(kart: Node3D, commande: Vector2, boutons: Array) -> void:
@@ -288,6 +474,10 @@ func _avancer_les_pepins(dt: float) -> void:
 			if kart != p["tireur"] and Vector2(ecart.x, ecart.z).length() < (2.4 if aerien else 1.7) and absf(ecart.y) < (2.0 if aerien else 0.9):
 				kart.recevoir_pepin()
 				p["tireur"].tirs += 1
+				if epreuve == "chasse":
+					kart.score = maxi(0, kart.score - R.CHASSE_PEPIN)
+				if epreuve == "patate" and patate.get("porteur") == p["tireur"]:
+					_donner_la_patate(kart, p["tireur"])  # un pépin refile aussi la patate
 				fini = true
 				break
 		if fini:
@@ -350,13 +540,20 @@ func _surveiller_les_flaques() -> void:
 
 
 func classement() -> Array:
-	var ordre := karts.duplicate()
+	if epreuve == "chasse":
+		var chasseurs := karts.duplicate()
+		chasseurs.sort_custom(func(a, b): return a.score > b.score)
+		return chasseurs
+	var ordre := karts.filter(func(k): return not k.elimine)
 	ordre.sort_custom(func(a, b):
 		if a.arrivee >= 0.0 and b.arrivee >= 0.0:
 			return a.arrivee < b.arrivee
 		if a.arrivee >= 0.0 or b.arrivee >= 0.0:
 			return a.arrivee >= 0.0
 		return a.distance > b.distance)
+	# Les éliminés viennent ensuite : le dernier sorti est le mieux classé.
+	for i in sortis.size():
+		ordre.append(sortis[sortis.size() - 1 - i])
 	return ordre
 
 
@@ -372,6 +569,18 @@ func _process(dt: float) -> void:
 			vue["tour"].text += "     Anneau %d / %d" % [kart.prochain % n + 1, n]
 			var anneau: Dictionary = piste.anneaux[kart.prochain % n]
 			vue["cible"].global_transform = Transform3D(Basis(anneau["droite"], anneau["axe"], anneau["droite"].cross(anneau["axe"])) * (1.0 + 0.06 * sin(temps * 8.0)), anneau["centre"])
+		# En haut à gauche : ce qui compte dans cette épreuve.
+		match epreuve:
+			"elimination":
+				vue["tour"].text = "Tour %d     Encore %d pilotes" % [manche, karts.size() - sortis.size()]
+			"chasse":
+				vue["tour"].text = "Graines : %d     Temps : %s" % [kart.score, _minutes(maxf(0.0, R.CHASSE_DUREE - temps))]
+			"patate":
+				vue["tour"].text = "Encore %d pilotes" % (karts.size() - sortis.size())
+			"chrono":
+				vue["tour"].text += "     %s" % _minutes(maxf(0.0, temps if kart.arrivee < 0.0 else kart.arrivee))
+				if record > 0.0:
+					vue["tour"].text += "     Record : %s" % _minutes(record)
 		vue["place"].text = "1er" if place == 1 else "%de" % place
 		var message := ""
 		if temps < -3.0:
@@ -380,18 +589,28 @@ func _process(dt: float) -> void:
 			message = str(int(ceil(-temps)))
 		elif temps < 1.0:
 			message = "Partez !"
+		elif kart.elimine:
+			message = "Éliminé !"
 		elif kart.arrivee >= 0.0:
-			message = "Arrivée !"
+			message = "Gagné !" if epreuve in ["elimination", "patate"] else "Arrivée !"
+		elif epreuve == "chasse" and temps >= R.CHASSE_DUREE:
+			message = "Fini !"
 		vue["message"].text = message
 		vue["bonus"].text = "Pépins : %d     Objet : %s" % [kart.pepins, NOMS_OBJETS.get(kart.objet, kart.objet)]
 		vue["annonce"].text = kart.annonce if kart.annonce_temps > 0.0 else ""
 	_cameras(minf(1.0, dt * 5.0))
 
 
-# Chaque caméra suit son kart en douceur.
+func _minutes(secondes: float) -> String:
+	return "%d:%04.1f" % [int(secondes) / 60, fmod(secondes, 60.0)]
+
+
+# Chaque caméra suit son kart en douceur. Si le joueur est éliminé, elle suit le premier.
 func _cameras(douceur: float) -> void:
 	for vue in vues:
 		var kart = vue["kart"]
+		if kart.elimine:
+			kart = classement()[0]
 		vue["cap"] = lerp_angle(vue["cap"], kart.cap, douceur)
 		var direction := Vector3(-sin(vue["cap"]), 0, -cos(vue["cap"]))
 		var ici: Vector3 = kart.ou_suis_je()

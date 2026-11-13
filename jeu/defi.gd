@@ -132,3 +132,26 @@ static func valider(nom_du_circuit: String, cle: String) -> void:
 		faits.append(cle)
 	tout["circuits"][nom_du_circuit] = faits
 	_ecrire(tout)
+
+
+# ── Les records du contre-la-montre ──────────────────────────
+
+const RECORDS := "user://records.json"
+
+
+# Le record d'un circuit : son temps et la trace de la course (pour le fantôme). Vide s'il n'y en a pas.
+static func record(cle: String) -> Dictionary:
+	if not FileAccess.file_exists(RECORDS):
+		return {}
+	var tout = JSON.parse_string(FileAccess.get_file_as_string(RECORDS))
+	return tout.get(cle, {}) if tout is Dictionary else {}
+
+
+static func noter_le_record(cle: String, temps: float, trace: Array) -> void:
+	var tout = JSON.parse_string(FileAccess.get_file_as_string(RECORDS)) if FileAccess.file_exists(RECORDS) else {}
+	if not tout is Dictionary:
+		tout = {}
+	tout[cle] = {"temps": temps, "trace": trace}
+	var fichier := FileAccess.open(RECORDS, FileAccess.WRITE)
+	if fichier != null:
+		fichier.store_string(JSON.stringify(tout))

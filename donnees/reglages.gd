@@ -38,6 +38,15 @@ const GRAINES_PAR_PLACE := [50, 30, 20, 10, 10, 10]  # ce qu'on gagne en finissa
 const GRAINES_DEFI := 100     # pour un défi de circuit réussi la première fois
 const GRAINES_ETOILE := 30    # pour chaque nouvelle étoile du défi du jour
 
+# Les épreuves (voir donnees/modes.gd)
+const CHASSE_DUREE := 120.0   # la durée de la chasse aux graines, en secondes
+const CHASSE_GRAINES := 60    # combien de graines sur le circuit en même temps
+const CHASSE_PEPIN := 2       # combien de graines on perd en recevant un pépin
+const PATATE_DUREE := [14.0, 24.0]  # la patate éclate après un temps tiré au hasard entre ces deux nombres
+const PATATE_VITESSE := 1.15  # celui qui porte la patate va un peu plus vite, pour rattraper les autres
+const PATATE_PEPINS := 3      # les pépins de chacun au départ
+const GRAINES_CHRONO := [20, 30]  # contre-la-montre : pour une course finie, puis en plus pour un record
+
 # Le saut
 const SAUT_FORCE := 6.5       # plus grand = on saute plus haut (au-dessus de 7, on passe par-dessus les barrières)
 
