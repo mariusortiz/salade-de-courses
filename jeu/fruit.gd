@@ -18,6 +18,7 @@ static func creer(pilote: Dictionary, vehicule: Dictionary = {}, en_avion := fal
 		_avion(kart, Color(pilote["kart"]), vehicule.get("forme", "kart"))
 	else:
 		_kart(kart, Color(pilote["kart"]), vehicule.get("forme", "kart"))
+	_plaque(kart, pilote)
 	_pilote(kart, pilote)
 	return kart
 
@@ -25,18 +26,16 @@ static func creer(pilote: Dictionary, vehicule: Dictionary = {}, en_avion := fal
 # ── Le kart ──────────────────────────────────────────────────
 
 static func _kart(kart: Node3D, couleur: Color, forme: String) -> void:
-	var peinture := _matiere(couleur)
-	peinture.metallic = 0.3
-	peinture.roughness = 0.3
+	var peinture := _peinture(couleur)   # la peinture brillante, avec de petites paillettes
+	var rayee := _carrosserie(couleur)   # la même, avec des bandes de course
 	var sombre := _matiere(Color("#2b2f3a"))
-	var metal := _matiere(Color("#c3c9d4"))
-	metal.metallic = 0.9
-	metal.roughness = 0.25
-	var bois := _matiere(Color("#c58b4e"))
+	var cuir := _cuir()
+	var metal := _metal()
+	var bois := _bois()
 
 	# Ce que tous les véhicules ont : le plancher, le siège et le volant.
 	_ajouter(kart, _boite(Vector3(1.15, 0.12, 2.6)), sombre, Vector3(0, 0.3, 0))
-	_ajouter(kart, _boite(Vector3(0.85, 0.8, 0.14)), sombre, Vector3(0, 0.78, 0.82)).rotation_degrees.x = -12
+	_ajouter(kart, _boite(Vector3(0.85, 0.8, 0.14)), cuir, Vector3(0, 0.78, 0.82)).rotation_degrees.x = -12
 	_membre(kart, Vector3(0, 0.55, -0.6), Vector3(0, 0.95, -0.25), 0.04, metal)
 	var cercle := TorusMesh.new()
 	cercle.inner_radius = 0.15
@@ -48,7 +47,7 @@ static func _kart(kart: Node3D, couleur: Color, forme: String) -> void:
 	match forme:
 		"buggy":
 			roues = [0.5, 0.5, 0.42, 0.98, -1.0, 0.95]
-			var nez := _ajouter(kart, _capsule(0.4, 1.3), peinture, Vector3(0, 0.5, -0.8))
+			var nez := _ajouter(kart, _capsule(0.4, 1.3), rayee, Vector3(0, 0.5, -0.8))
 			nez.rotation_degrees.x = 90
 			nez.scale = Vector3(1, 1, 0.7)
 			# L'arceau derrière le siège, avec ses deux phares.
@@ -63,12 +62,12 @@ static func _kart(kart: Node3D, couleur: Color, forme: String) -> void:
 				_ajouter(kart, _capsule(0.1, 1.9), metal, Vector3(0, 0.45, z)).rotation_degrees.z = 90
 		"bolide":
 			roues = [0.3, 0.4, 0.42, 0.9, -1.35, 0.9]
-			var nez := _ajouter(kart, _capsule(0.36, 2.6), peinture, Vector3(0, 0.4, -1.1))
+			var nez := _ajouter(kart, _capsule(0.36, 2.6), rayee, Vector3(0, 0.4, -1.1))
 			nez.rotation_degrees.x = 90
 			nez.scale = Vector3(1, 1, 0.55)
 			_ajouter(kart, _boite(Vector3(2.1, 0.06, 0.45)), peinture, Vector3(0, 0.2, -2.3))  # l'aileron avant
 			for x: float in [-0.6, 0.6]:
-				_ajouter(kart, _capsule(0.22, 1.3), peinture, Vector3(x, 0.4, 0.3)).rotation_degrees.x = 90
+				_ajouter(kart, _capsule(0.22, 1.3), rayee, Vector3(x, 0.4, 0.3)).rotation_degrees.x = 90
 				_ajouter(kart, _boite(Vector3(0.06, 0.75, 0.5)), sombre, Vector3(x * 1.3, 1.1, 1.5))
 			_ajouter(kart, _boite(Vector3(1.7, 0.07, 0.5)), peinture, Vector3(0, 1.5, 1.5))  # le grand aileron arrière
 			_ajouter(kart, _capsule(0.3, 1.3), sombre, Vector3(0, 0.75, 1.25)).rotation_degrees.x = 90  # le moteur
@@ -96,11 +95,11 @@ static func _kart(kart: Node3D, couleur: Color, forme: String) -> void:
 			_ajouter(kart, _boite(Vector3(0.03, 0.3, 0.5)), peinture, Vector3(0.55, 2.15, 1.55))
 		_:
 			# Le kart : un nez, deux pontons, les pare-chocs, le moteur, les pots et l'aileron.
-			var nez := _ajouter(kart, _capsule(0.42, 1.7), peinture, Vector3(0, 0.42, -0.75))
+			var nez := _ajouter(kart, _capsule(0.42, 1.7), rayee, Vector3(0, 0.42, -0.75))
 			nez.rotation_degrees.x = 90
 			nez.scale = Vector3(1, 1, 0.6)
 			for x in [-0.62, 0.62]:
-				_ajouter(kart, _capsule(0.26, 1.5), peinture, Vector3(x, 0.42, 0.2)).rotation_degrees.x = 90
+				_ajouter(kart, _capsule(0.26, 1.5), rayee, Vector3(x, 0.42, 0.2)).rotation_degrees.x = 90
 			for z in [-1.55, 1.45]:
 				_ajouter(kart, _capsule(0.08, 1.7), metal, Vector3(0, 0.32, z)).rotation_degrees.z = 90
 			_ajouter(kart, _boite(Vector3(0.7, 0.4, 0.45)), metal, Vector3(0, 0.52, 1.12))
@@ -112,8 +111,7 @@ static func _kart(kart: Node3D, couleur: Color, forme: String) -> void:
 				_ajouter(kart, _boite(Vector3(0.05, 0.3, 0.42)), peinture, Vector3(x * 1.5, 1.18, 1.35))
 
 	# Les roues tournent, et celles de devant suivent le volant (voir kart.gd).
-	var gomme := _matiere(Color("#1c1c1f"))
-	gomme.roughness = 0.9
+	var gomme := _pneu()
 	var jaune := _matiere(Color("#ffd54f"))
 	var tournantes: Array = []
 	var directrices: Array = []
@@ -140,18 +138,15 @@ static func _kart(kart: Node3D, couleur: Color, forme: String) -> void:
 # Dans le mode Avions, chaque véhicule devient un avion :
 # kart = monoplan, buggy = biplan, bolide = jet, tracteur = coucou, cagette = planeur en bois.
 static func _avion(avion: Node3D, couleur: Color, forme: String) -> void:
-	var peinture := _matiere(couleur)
-	peinture.metallic = 0.3
-	peinture.roughness = 0.3
+	var peinture := _peinture(couleur)
 	var sombre := _matiere(Color("#2b2f3a"))
-	var metal := _matiere(Color("#c3c9d4"))
-	metal.metallic = 0.9
-	metal.roughness = 0.25
-	var coque := _matiere(Color("#c58b4e")) if forme == "cagette" else peinture
+	var cuir := _cuir()
+	var metal := _metal()
+	var coque := _bois() if forme == "cagette" else _carrosserie(couleur)
 
 	# Le plancher, le siège et le manche.
 	_ajouter(avion, _boite(Vector3(1.15, 0.12, 2.6)), sombre, Vector3(0, 0.3, 0))
-	_ajouter(avion, _boite(Vector3(0.85, 0.8, 0.14)), sombre, Vector3(0, 0.78, 0.82)).rotation_degrees.x = -12
+	_ajouter(avion, _boite(Vector3(0.85, 0.8, 0.14)), cuir, Vector3(0, 0.78, 0.82)).rotation_degrees.x = -12
 	_membre(avion, Vector3(0, 0.55, -0.6), Vector3(0, 0.95, -0.25), 0.04, metal)
 	var cercle := TorusMesh.new()
 	cercle.inner_radius = 0.15
@@ -352,6 +347,109 @@ static func _peau(couleur: Color, motif: String) -> StandardMaterial3D:
 	image.generate_mipmaps()
 	matiere.albedo_texture = ImageTexture.create_from_image(image)
 	return matiere
+
+
+# ── Les matières des véhicules ───────────────────────────────
+
+static var textures := {}  # les textures sont dessinées une seule fois, puis gardées
+
+
+# Dessine une texture point par point. « pinceau » reçoit x, y (de 0 à 1) et un grain
+# au hasard (de 0 à 1), et répond la couleur du point.
+static func _dessiner(cle: String, cote: int, grain: float, pinceau: Callable) -> ImageTexture:
+	if textures.has(cle):
+		return textures[cle]
+	var bruit := FastNoiseLite.new()
+	bruit.frequency = grain
+	var taches: Image = bruit.get_seamless_image(cote, cote)
+	var image := Image.create(cote, cote, false, Image.FORMAT_RGB8)
+	for y in cote:
+		for x in cote:
+			image.set_pixel(x, y, pinceau.call(float(x) / cote, float(y) / cote, taches.get_pixel(x, y).r))
+	image.generate_mipmaps()
+	textures[cle] = ImageTexture.create_from_image(image)
+	return textures[cle]
+
+
+static func _texturee(texture: Texture2D, metal: float, rugosite: float, partout := 0.0) -> StandardMaterial3D:
+	var matiere := StandardMaterial3D.new()
+	matiere.albedo_texture = texture
+	matiere.metallic = metal
+	matiere.roughness = rugosite
+	matiere.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	if partout > 0.0:
+		# La texture est plaquée de tous les côtés, à la même taille partout.
+		matiere.uv1_triplanar = true
+		matiere.uv1_scale = Vector3.ONE * partout
+	return matiere
+
+
+# La peinture : brillante, avec de petites paillettes.
+static func _peinture(couleur: Color) -> StandardMaterial3D:
+	var texture := _dessiner("peinture" + couleur.to_html(), 64, 0.35, func(_x: float, _y: float, g: float) -> Color:
+		return couleur.darkened(0.12).lerp(couleur.lightened(0.1), g))
+	return _texturee(texture, 0.45, 0.22, 1.5)
+
+
+# La carrosserie : la même peinture, avec deux bandes blanches de chaque côté et des lignes de tôle.
+static func _carrosserie(couleur: Color) -> StandardMaterial3D:
+	var texture := _dessiner("carrosserie" + couleur.to_html(), 128, 0.35, func(x: float, y: float, g: float) -> Color:
+		var bande := absf(fposmod(x, 0.5) - 0.25)  # 0 au milieu d'une bande
+		if bande > 0.012 and bande < 0.045:
+			return Color("#f7f7f7").darkened(0.06 * g)
+		if absf(fposmod(x + 0.25, 0.5) - 0.25) < 0.006 or absf(fposmod(y, 0.34) - 0.17) < 0.006:
+			return couleur.darkened(0.45)
+		return couleur.darkened(0.12).lerp(couleur.lightened(0.1), g))
+	return _texturee(texture, 0.45, 0.22)
+
+
+# Les pneus : du caoutchouc avec des rainures en biais.
+static func _pneu() -> StandardMaterial3D:
+	var texture := _dessiner("pneu", 64, 0.3, func(x: float, y: float, g: float) -> Color:
+		var rainure := fposmod(x * 4.0 + absf(y * 4.0 - 1.0), 0.5) < 0.16
+		return Color("#0c0c0e") if rainure else Color("#26262b").darkened(0.2 * g))
+	var matiere := _texturee(texture, 0.0, 0.95)
+	matiere.uv1_scale = Vector3(6, 1, 1)
+	return matiere
+
+
+# Le métal brossé.
+static func _metal() -> StandardMaterial3D:
+	var texture := _dessiner("metal", 64, 0.08, func(_x: float, y: float, g: float) -> Color:
+		return Color("#aab1bd").lerp(Color("#dfe4ec"), fposmod(g * 3.0 + y * 13.0, 1.0)))
+	return _texturee(texture, 0.9, 0.3, 2.0)
+
+
+# Le cuir du siège, avec ses coutures en losange.
+static func _cuir() -> StandardMaterial3D:
+	var texture := _dessiner("cuir", 64, 0.4, func(x: float, y: float, g: float) -> Color:
+		var couture := absf(fposmod(x + y, 0.5) - 0.25) < 0.02 or absf(fposmod(x - y, 0.5) - 0.25) < 0.02
+		return Color("#59607a") if couture else Color("#262a36").lightened(0.06 * g))
+	return _texturee(texture, 0.0, 0.6, 2.0)
+
+
+# Le bois : des planches, avec leurs veines.
+static func _bois() -> StandardMaterial3D:
+	var texture := _dessiner("bois", 64, 0.06, func(_x: float, y: float, g: float) -> Color:
+		if fposmod(y, 0.5) < 0.04:
+			return Color("#6d4423")
+		return Color("#b97e45").lerp(Color("#d8a366"), fposmod(g * 6.0, 1.0)))
+	return _texturee(texture, 0.0, 0.8, 1.2)
+
+
+# La plaque avec le numéro du pilote, au dos du siège.
+static func _plaque(kart: Node3D, pilote: Dictionary) -> void:
+	var blanc := _matiere(Color("#f7f7f7"))
+	var plaque := _ajouter(kart, _boite(Vector3(0.62, 0.46, 0.03)), blanc, Vector3(0, 0.92, 0.93))
+	plaque.rotation_degrees.x = -12
+	var numero := Label3D.new()
+	numero.text = str(int(pilote.get("numero", absi(str(pilote["nom"]).hash()) % 98 + 1)))
+	numero.font_size = 96
+	numero.pixel_size = 0.004
+	numero.modulate = Color("#1d2433")
+	numero.outline_size = 0
+	numero.position = Vector3(0, 0, 0.02)
+	plaque.add_child(numero)
 
 
 # ── Les outils ───────────────────────────────────────────────

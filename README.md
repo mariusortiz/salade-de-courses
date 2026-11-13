@@ -34,22 +34,34 @@ Dans le menu, « Mode : Avions » transforme chaque véhicule en avion. La cours
 au-dessus du même circuit : il faut traverser les anneaux dans l'ordre. Le prochain est entouré de jaune.
 Un anneau orange donne un turbo, et certains portent des cagettes à bonus.
 
-- L'avion avance tout seul. Gauche et droite pour tourner, haut pour monter, bas pour descendre.
+- L'avion avance tout seul. Gauche et droite pour tourner. Comme avec un vrai manche, Haut fait piquer
+  et Bas fait monter (ça s'inverse avec `AVION_HAUT_MONTE` dans `donnees/reglages.gd`).
 - Le bouton du dérapage sert de frein. Tirer un pépin et utiliser l'objet marchent comme en kart
   (le jus devient un nuage qui ralentit ceux qui le traversent).
 - Si on passe à côté d'un anneau, on est reposé juste devant lui.
+
+### Les obstacles et le défi du jour
+
+Les obstacles sont entourés d'un cercle rouge : un tonneau à la campagne, un oursin dans l'aquarium,
+un glaçon dans le frigo... Les toucher fait faire un tête-à-queue. Certains ne bougent pas, d'autres
+traversent la route. En avion, ils flottent entre les anneaux.
+
+Chaque jour, le menu propose un défi : un circuit, un mode et une règle spéciale tirés au sort
+(le même pour tout le monde ce jour-là). On gagne une étoile en finissant, deux sur le podium,
+trois en gagnant. Les étoiles sont gardées sur l'appareil, et le menu compte les jours de suite.
 
 Si le kart sort de la piste, il y est reposé au bout de deux secondes.
 
 ## Modifier le jeu
 
-Quatre fichiers sont faits pour être changés. Chacun commence par son mode d'emploi.
+Cinq fichiers sont faits pour être changés. Chacun commence par son mode d'emploi.
 
 | Fichier | Ce qu'on y change |
 | --- | --- |
 | `donnees/circuits.gd` | Les circuits : la liste des points par où passe la route (avec leur hauteur), les turbos, les tremplins, les cagettes à bonus, la musique |
 | `donnees/pilotes.gd` | Les fruits : nom, forme, motif de la peau, couleurs, vitesse, accélération, maniabilité, modèle 3D |
 | `donnees/vehicules.gd` | Les véhicules : nom, forme, et ce qu'ils ajoutent ou enlèvent en vitesse, accélération, maniabilité |
+| `donnees/defis.gd` | Les règles spéciales des défis du jour |
 | `donnees/reglages.gd` | Le titre, la gravité, l'adhérence, le turbo, le saut, les bonus, le volume de la musique, le niveau des ordinateurs, le nombre de karts, les nombres de tours proposés, le décor, les couleurs |
 
 Le reste du code est dans `jeu/` :
@@ -60,7 +72,8 @@ Le reste du code est dans `jeu/` :
 - `avion.gd` gère le vol dans le mode Avions (c'est un kart qui vole : il garde les bonus du kart) ;
 - `fruit.gd` dessine le fruit (avec ses bras et ses jambes) et son véhicule ;
 - `course.gd` gère le départ, les touches, les bonus, les écrans des joueurs et le classement ;
-- `main.gd` gère le menu et la musique.
+- `defi.gd` tire au sort le défi du jour et garde les étoiles ;
+- `main.gd` gère le menu (avec l'aperçu du pilote et le plan du circuit), le classement et la musique.
 
 ## Ajouter un circuit ou un décor
 

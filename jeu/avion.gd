@@ -48,6 +48,8 @@ func _avancer(dt: float) -> void:
 		var ordre := _pilote_auto() if auto else commande
 		volant = ordre.x
 		montee = ordre.y
+		if not auto and not R.AVION_HAUT_MONTE:
+			montee = -montee
 	var en_vrille := _gerer_les_bonus(dt)
 	if en_vrille:
 		volant = 0.0

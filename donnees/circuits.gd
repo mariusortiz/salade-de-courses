@@ -15,6 +15,8 @@
 #    turbos     où poser les turbos : 0.0 = au départ, 0.5 = à la moitié du tour
 #    tremplins  pareil pour les tremplins (à mettre dans une ligne droite)
 #    bonus      pareil pour les rangées de cagettes à bonus
+#    obstacles  où poser les obstacles (si on n'écrit rien : 0.3, 0.5, 0.7 et 0.9).
+#               Une fois sur deux ils ne bougent pas, sinon ils traversent la route.
 #    musique    le fichier de musique du circuit, dans le dossier musique/
 #    decor      "campagne" (si on n'écrit rien), "espace", "montagne", "grotte", "pizza",
 #               "aquarium", "frigo" ou "potager". Les décors sont fabriqués dans jeu/decor.gd.

@@ -451,6 +451,58 @@ func potager() -> void:
 	_nuages()
 
 
+# ── Les obstacles ────────────────────────────────────────────
+
+# Fabrique un obstacle aux couleurs du décor. Il est toujours entouré d'un cercle rouge,
+# pour qu'on le reconnaisse de loin.
+func obstacle(nom: String) -> Node3D:
+	var o = Node3D.new()
+	var alerte = TorusMesh.new()
+	alerte.inner_radius = 1.75
+	alerte.outer_radius = 2.0
+	p._objet(alerte, _lumineux(Color("#ff1744")), Vector3.ZERO, Vector3.ONE, o).rotation.x = PI / 2.0
+	p._objet(alerte, _lumineux(Color("#ff1744")), Vector3.ZERO, Vector3.ONE, o).rotation.z = PI / 2.0
+	match nom:
+		"espace":
+			p._objet(p._boule(1.3), p._matiere("#5d5560"), Vector3.ZERO, Vector3(1.1, 0.9, 1.0), o)
+			for j in 5:
+				p._objet(p._boule(0.35), _lumineux(Color("#ff7043")), Vector3(cos(j * 1.26), sin(j * 2.0) * 0.6, sin(j * 1.26)) * 1.1, Vector3.ONE, o)
+		"montagne":
+			p._objet(p._boule(1.35), p._matiere("#ffffff"), Vector3.ZERO, Vector3.ONE, o)
+			p._objet(p._boule(0.7), p._matiere("#e3f2fd"), Vector3(0.7, 0.8, 0.3), Vector3.ONE, o)
+		"grotte":
+			var pointe = p._cylindre(0.0, 0.5, 2.6)
+			pointe.radial_segments = 6
+			for j in 6:
+				var c = p._objet(pointe, _lumineux(Color.from_hsv(j / 6.0, 0.7, 1.0)), Vector3.ZERO, Vector3.ONE, o)
+				c.rotation = Vector3(cos(j * 1.05) * 1.1, 0, sin(j * 1.05) * 1.1)
+		"pizza":
+			var olive = TorusMesh.new()
+			olive.inner_radius = 0.45
+			olive.outer_radius = 1.35
+			p._objet(olive, p._matiere("#1f1f24"), Vector3.ZERO, Vector3(1, 1.4, 1), o)
+			p._objet(p._boule(0.5), p._matiere("#e53935"), Vector3.ZERO, Vector3.ONE, o)
+		"aquarium":
+			# Un oursin, avec ses piquants.
+			p._objet(p._boule(1.0), p._matiere("#311b47"), Vector3.ZERO, Vector3.ONE, o)
+			for j in 14:
+				var direction = Vector3(cos(j * 2.4) * sin(j * 0.45 + 0.3), cos(j * 0.45 + 0.3), sin(j * 2.4) * sin(j * 0.45 + 0.3))
+				Fruit._membre(o, direction * 0.8, direction * 1.6, 0.07, p._matiere("#6a3d9a"))
+		"frigo":
+			var glacon = p._objet(_boite(Vector3.ONE * 2.1), _verre(Color(0.6, 0.9, 1.0, 0.75)), Vector3.ZERO, Vector3.ONE, o)
+			glacon.rotation = Vector3(0.5, 0.3, 0.4)
+		"potager":
+			for j in 5:
+				p._objet(p._boule(1.0), p._matiere("#ef6c00" if j % 2 == 0 else "#f57c00"), Vector3.ZERO, Vector3(0.95, 1.05, 1.3), o).rotation.y = j * PI / 5.0
+			p._objet(p._cylindre(0.15, 0.22, 0.6), p._matiere("#2f7d3a"), Vector3(0, 1.2, 0), Vector3.ONE, o)
+		_:
+			# La campagne : un tonneau.
+			p._objet(p._cylindre(1.0, 1.0, 2.2), p._matiere_texture("bois", "bois", []), Vector3.ZERO, Vector3.ONE, o)
+			for y in [-0.7, 0.7]:
+				p._objet(p._cylindre(1.05, 1.05, 0.15), p._matiere("#455a64"), Vector3(0, y, 0), Vector3.ONE, o)
+	return o
+
+
 # ── Les morceaux de décor qui servent plusieurs fois ─────────
 
 # sortes : 0 = arbre rond, 1 = sapin, 2 = arbre fruitier

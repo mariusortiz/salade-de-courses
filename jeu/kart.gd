@@ -48,6 +48,7 @@ var bouclier := 0.0       # secondes de bouclier qui restent
 var toupie := 0.0         # secondes de tête-à-queue qui restent
 var englue := 0.0         # secondes de ralentissement dans le jus qui restent
 var repos_saut := 0.0
+var protege := 0.0        # secondes pendant lesquelles un obstacle ne peut plus nous toucher
 var tir_avant := false
 var objet_avant := false
 var bulle: MeshInstance3D
@@ -74,7 +75,7 @@ func preparer(le_pilote: Dictionary, la_piste: Node3D, est_humain: bool, vehicul
 	humain = est_humain
 	auto = not est_humain
 
-	var niveau := 1.0 if humain else R.NIVEAU_ORDIS * randf_range(0.95, 1.03)
+	var niveau: float = 1.0 if humain else piste.niveau_ordis * randf_range(0.95, 1.03)
 	# Les points du pilote, plus ou moins ceux de son véhicule.
 	vmax = (26.0 + (pilote["vitesse"] + vehicule.get("vitesse", 0)) * 1.5) * niveau
 	acceleration = 12.0 + (pilote["acceleration"] + vehicule.get("acceleration", 0)) * 4.0
@@ -211,6 +212,19 @@ func recevoir_pepin() -> void:
 		derapage = 0.0
 
 
+# Le kart touche un obstacle : tête-à-queue, sauf si le bouclier le protège.
+# Ensuite il est tranquille quelques secondes, le temps de repartir.
+func heurter() -> void:
+	if protege > 0.0:
+		return
+	protege = R.TETE_A_QUEUE + 2.0
+	if bouclier > 0.0:
+		bouclier = 0.0
+	else:
+		toupie = R.TETE_A_QUEUE
+		derapage = 0.0
+
+
 # Le kart roule dans une flaque de jus : il est ralenti, sauf avec un bouclier.
 func rouler_dans_le_jus() -> void:
 	if bouclier <= 0.0:
@@ -244,6 +258,7 @@ func _gerer_les_bonus(dt: float) -> bool:
 	englue = maxf(0.0, englue - dt)
 	annonce_temps = maxf(0.0, annonce_temps - dt)
 	repos_saut = maxf(0.0, repos_saut - dt)
+	protege = maxf(0.0, protege - dt)
 	var en_toupie := toupie > 0.0
 	toupie = maxf(0.0, toupie - dt)
 	if en_toupie:
@@ -409,7 +424,16 @@ func _dessiner(dt: float) -> void:
 # L'ordinateur vise un point un peu plus loin sur la piste.
 func _pilote_auto() -> Vector2:
 	var cible: Transform3D = piste.repere(position_piste + 8.0 + absf(vitesse) * 0.35)
-	var vers := cible.origin + cible.basis.x * cote - boule.global_position
+	# Il se décale s'il y a un obstacle devant lui.
+	var voie := cote
+	var bord: float = piste.largeur / 2.0 - 1.5
+	for o in piste.obstacles:
+		var devant_moi := wrapf(o["distance"] - position_piste, -piste.longueur / 2.0, piste.longueur / 2.0)
+		if devant_moi > 0.0 and devant_moi < 30.0 and absf(o["voie"] - voie) < 3.2:
+			voie = o["voie"] + (3.8 if voie >= o["voie"] else -3.8)
+			if absf(voie) > bord:
+				voie = o["voie"] - signf(voie) * 3.8
+	var vers := cible.origin + cible.basis.x * voie - boule.global_position
 	var ecart := wrapf(atan2(-vers.x, -vers.z) - cap, -PI, PI)
 	var trop_vite := absf(ecart) > 0.6 and vitesse > vmax * 0.6
 	return Vector2(clampf(-ecart * 3.0, -1.0, 1.0), -1.0 if trop_vite else 1.0)

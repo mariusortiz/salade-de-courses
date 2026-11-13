@@ -18,6 +18,10 @@ var turbos: Array = []    # positions des turbos, en mètres depuis le départ
 const RAYON_ANNEAU := 6.0
 
 var anneaux: Array = []   # les anneaux du mode Avions, dans l'ordre
+var obstacles: Array = [] # les obstacles : les toucher fait faire un tête-à-queue
+var horloge := 0.0
+var regle := ""           # la règle du défi du jour, s'il y en a une (voir donnees/defis.gd)
+var niveau_ordis: float = R.NIVEAU_ORDIS
 var cagettes: Array = []  # les cagettes à bonus posées sur la route
 var jalons: Array[Vector3] = []  # un point de la route tous les 4 mètres, pour placer le décor
 var zone := Rect2()
@@ -32,6 +36,13 @@ func construire(def: Dictionary, aerien := false) -> void:
 	tours = def.get("tours", 3)
 	var decor: String = def.get("decor", "campagne")
 	ambiance = Decor.ambiance(decor)
+	match regle:
+		"lune":
+			ambiance["gravite"] *= 0.5
+		"patinoire":
+			ambiance["adherence"] *= 0.4
+		"rapides":
+			niveau_ordis = 1.0
 	hasard.seed = 7  # toujours le même décor aux mêmes endroits
 
 	# La courbe passe par tous les points, en arrondissant les virages.
@@ -72,12 +83,21 @@ func construire(def: Dictionary, aerien := false) -> void:
 			_rangee_de_cagettes(float(part) * longueur)
 	if ambiance["tribunes"]:
 		_tribunes()
-	Decor.new().planter(self, decor)
+	var decorateur := Decor.new()
+	decorateur.planter(self, decor)
+	_obstacles(def, aerien, decorateur, decor)
 
 
 func _process(dt: float) -> void:
 	for c in cagettes:
 		c.rotate_y(dt * 1.5)
+	# Les obstacles : certains ne bougent pas, d'autres vont et viennent.
+	horloge += dt
+	for o in obstacles:
+		var va_et_vient: float = o["amplitude"] * sin(horloge * R.OBSTACLES_VITESSE + o["phase"])
+		o["noeud"].position = o["base"] + o["axe"] * va_et_vient
+		o["noeud"].rotate_y(dt)
+		o["voie"] = o["voie_de_base"] + (va_et_vient if o["en_travers"] else 0.0)
 	for a in animes:
 		var noeud: Node3D = a["noeud"]
 		if a.has("monte"):
@@ -419,6 +439,46 @@ func _anneaux(def: Dictionary) -> void:
 		if speciaux.get(k, "") == "bonus":
 			for i in 3:
 				_cagette(centre + r.basis.x * (i - 1) * 3.0)
+
+
+# Les obstacles. En kart : aux endroits écrits dans "obstacles" (une fois sur deux, deux obstacles
+# qui ne bougent pas, sinon un obstacle qui traverse la route). En avion : entre deux anneaux.
+func _obstacles(def: Dictionary, aerien: bool, decorateur: RefCounted, decor: String) -> void:
+	if aerien:
+		var pas: int = 1 if regle == "obstacles" else R.OBSTACLES_AVIONS
+		for k in range(1, anneaux.size(), pas):
+			var a: Dictionary = anneaux[k]
+			var b: Dictionary = anneaux[(k + 1) % anneaux.size()]
+			var monte := (k / pas) % 2 == 0  # une fois de haut en bas, une fois de gauche à droite
+			_obstacle(decorateur, decor, (a["centre"] + b["centre"]) / 2.0, Vector3.UP if monte else a["droite"], 4.0, a["distance"], 0.0, not monte)
+		return
+	var occupes: Array = def.get("turbos", []) + def.get("tremplins", []) + def.get("bonus", [])
+	var numero := 0
+	var endroits: Array = def.get("obstacles", [0.3, 0.5, 0.7, 0.9])
+	if regle == "obstacles":
+		endroits = endroits + endroits.map(func(e): return fposmod(e + 0.1, 1.0))
+	for part in endroits:
+		# On décale un obstacle qui tomberait sur un turbo, un tremplin ou des cagettes.
+		var ou: float = part
+		for autre in occupes:
+			if absf(ou - autre) < 0.03:
+				ou = autre + 0.045
+		var r := repere(ou * longueur)
+		var base := r.origin + r.basis.y * 1.3
+		if numero % 2 == 0:
+			for voie in [-largeur * 0.24, largeur * 0.28]:
+				_obstacle(decorateur, decor, base + r.basis.x * voie, r.basis.x, 0.0, ou * longueur, voie, true)
+		else:
+			_obstacle(decorateur, decor, base, r.basis.x, largeur / 2.0 - 2.4, ou * longueur, 0.0, true)
+		numero += 1
+
+
+func _obstacle(decorateur: RefCounted, decor: String, base: Vector3, axe: Vector3, amplitude: float, distance: float, voie: float, en_travers: bool) -> void:
+	var noeud: Node3D = decorateur.obstacle(decor)
+	noeud.position = base
+	add_child(noeud)
+	obstacles.append({"noeud": noeud, "base": base, "axe": axe, "amplitude": amplitude, "phase": obstacles.size() * 1.9,
+		"distance": distance, "voie_de_base": voie, "voie": voie, "en_travers": en_travers})
 
 
 # ── Le décor ─────────────────────────────────────────────────

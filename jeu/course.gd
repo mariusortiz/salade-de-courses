@@ -37,10 +37,11 @@ var aerien := false      # true = le mode Avions
 
 # humains : les numéros des pilotes des joueurs. vehicules : le numéro du véhicule de chacun.
 # tours : 0 = le nombre de tours écrit dans le circuit.
-# en_avion : true = le mode Avions.
-func demarrer(circuit: Dictionary, humains: Array, vehicules: Array = [], tours := 0, en_avion := false) -> void:
+# en_avion : true = le mode Avions. regle : l'effet du défi du jour ("" = aucun).
+func demarrer(circuit: Dictionary, humains: Array, vehicules: Array = [], tours := 0, en_avion := false, regle := "") -> void:
 	aerien = en_avion
 	piste = Piste.new()
+	piste.regle = regle
 	add_child(piste)
 	piste.construire(circuit, aerien)
 	if tours > 0:
@@ -67,6 +68,8 @@ func demarrer(circuit: Dictionary, humains: Array, vehicules: Array = [], tours 
 		if demo:
 			kart.auto = true
 		kart.adversaires = karts
+		if regle == "pepins":
+			kart.pepins = R.PEPINS_MAXIMUM
 		kart.tire.connect(_lancer_un_pepin)
 		kart.verse.connect(_verser_du_jus)
 		karts.append(kart)
@@ -198,6 +201,10 @@ func _physics_process(dt: float) -> void:
 	_ramasser_les_cagettes()
 	_avancer_les_pepins(dt)
 	_surveiller_les_flaques()
+	for o in piste.obstacles:
+		for kart in karts:
+			if kart.ou_suis_je().distance_to(o["noeud"].position) < (3.0 if aerien else 2.1):
+				kart.heurter()
 	var but: float = piste.longueur * piste.tours
 	for kart in karts:
 		kart.actif = true
