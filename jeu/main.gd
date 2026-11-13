@@ -10,6 +10,7 @@ const Course = preload("res://jeu/course.gd")
 const Decor = preload("res://jeu/decor.gd")
 const Fruit = preload("res://jeu/fruit.gd")
 const Defi = preload("res://jeu/defi.gd")
+const Magasin = preload("res://jeu/magasin.gd")
 
 # Les couleurs du menu.
 const FOND := Color("#101629")
@@ -29,6 +30,9 @@ var course: Node
 var defi := {}             # le défi du jour, quand on est en train de le jouer
 var tournants: Array = []  # les plateaux du menu, qui tournent pour montrer les pilotes
 var angle := 0.0
+var au_magasin := false     # true = on regarde le magasin au lieu du menu
+var rayon_avions := false   # le rayon du magasin : les voitures ou les avions
+var en_demo := false
 
 # Pour les essais automatiques (voir le README, partie « Vérifier »).
 var essai_circuit := -1
@@ -78,6 +82,11 @@ func _ready() -> void:
 			choix["vehicules"] = [int(option.trim_prefix("--vehicule=")), int(option.trim_prefix("--vehicule="))]
 		elif option.begins_with("--circuit="):
 			choix["circuit"] = int(option.trim_prefix("--circuit="))
+		elif option == "--magasin":
+			au_magasin = true
+			rayon_avions = choix["avions"]
+		elif option.begins_with("--graines="):
+			Magasin.gagner(int(option.trim_prefix("--graines=")))
 		elif option.begins_with("--onglet="):
 			choix["onglet"] = int(option.trim_prefix("--onglet="))
 		elif option.begins_with("--joueurs="):
@@ -127,6 +136,13 @@ func _montrer_menu() -> void:
 	var page := VBoxContainer.new()
 	page.add_theme_constant_override("separation", 14)
 	marge.add_child(page)
+	if au_magasin:
+		_montrer_le_magasin(page)
+		return
+	# Si le véhicule choisi n'est pas (ou plus) dans le garage, on reprend le premier.
+	for j in 2:
+		if not Magasin.possede(choix["vehicules"][j], choix["avions"]):
+			choix["vehicules"][j] = 0
 
 	# En haut : le titre, puis le mode, le nombre de joueurs et le nombre de tours.
 	var entete := HBoxContainer.new()
@@ -134,6 +150,13 @@ func _montrer_menu() -> void:
 	page.add_child(entete)
 	var titre := _texte(entete, R.TITRE, 36, TEXTE, true)
 	titre.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_texte(entete, "%d graines" % Magasin.graines(), 17, JAUNE, true).vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	var boutique := _bouton("Magasin", CARTE_CLAIRE, JAUNE, 17)
+	boutique.pressed.connect(func():
+		au_magasin = true
+		rayon_avions = choix["avions"]
+		_montrer_menu())
+	entete.add_child(boutique)
 	_reglette(entete, "Mode", ["Karts", "Avions"], 1 if choix["avions"] else 0, func(i): choix["avions"] = i == 1)
 	_reglette(entete, "Joueurs", ["1", "2"], choix["joueurs"] - 1, func(i): choix["joueurs"] = i + 1)
 	_reglette(entete, "Tours", R.CHOIX_DE_TOURS.map(func(t): return str(t)), R.CHOIX_DE_TOURS.find(choix["tours"]), func(i): choix["tours"] = R.CHOIX_DE_TOURS[i])
@@ -185,11 +208,38 @@ func _carte_du_joueur(parent: Control, j: int) -> void:
 	var pilote: Dictionary = Pilotes.PILOTES[choix["pilotes"][j]]
 	var vehicule: Dictionary = Vehicules.VEHICULES[choix["vehicules"][j]]
 
-	# L'aperçu en 3D.
+	_apercu(carte, pilote, vehicule, choix["avions"])
+
+	var nombre := Pilotes.PILOTES.size()
+	_selecteur(carte, pilote["nom"], Color(pilote["couleur"]).lightened(0.35), 26,
+		func(): choix["pilotes"][j] = (choix["pilotes"][j] + nombre - 1) % nombre,
+		func(): choix["pilotes"][j] = (choix["pilotes"][j] + 1) % nombre)
+	# On ne peut choisir que les véhicules de son garage (les autres s'achètent au magasin).
+	var garage: Array = Magasin.garage(choix["avions"])
+	var rang: int = maxi(0, garage.find(choix["vehicules"][j]))
+	_selecteur(carte, vehicule["avion"] if choix["avions"] else vehicule["nom"], TEXTE, 20,
+		func(): choix["vehicules"][j] = garage[(rang + garage.size() - 1) % garage.size()],
+		func(): choix["vehicules"][j] = garage[(rang + 1) % garage.size()])
+
+	# Les points : ceux du pilote, plus ou moins ceux du véhicule.
+	var points := GridContainer.new()
+	points.columns = 2
+	points.add_theme_constant_override("h_separation", 14)
+	points.add_theme_constant_override("v_separation", 6)
+	points.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	carte.add_child(points)
+	for qualite in [["Vitesse", "vitesse"], ["Accélération", "acceleration"], ["Maniabilité", "maniabilite"]]:
+		_texte(points, qualite[0], 15, DISCRET)
+		_pastilles(points, pilote[qualite[1]] + vehicule[qualite[1]], 6, JAUNE)
+
+
+# Montre un pilote dans son véhicule, en 3D, sur un plateau qui tourne.
+# etroit : true quand la carte est plus haute que large (au magasin).
+func _apercu(parent: Control, pilote: Dictionary, vehicule: Dictionary, en_avion: bool, etroit := false) -> void:
 	var cadre := SubViewportContainer.new()
 	cadre.stretch = true
 	cadre.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	carte.add_child(cadre)
+	parent.add_child(cadre)
 	var scene := SubViewport.new()
 	scene.own_world_3d = true
 	scene.transparent_bg = true
@@ -210,7 +260,7 @@ func _carte_du_joueur(parent: Control, j: int) -> void:
 	scene.add_child(plateau)
 	tournants.append(plateau)
 	var socle := CylinderMesh.new()
-	socle.top_radius = 5.4 if choix["avions"] else 2.7
+	socle.top_radius = 5.4 if en_avion else 2.7
 	socle.bottom_radius = socle.top_radius + 0.2
 	socle.height = 0.2
 	var disque := MeshInstance3D.new()
@@ -218,34 +268,73 @@ func _carte_du_joueur(parent: Control, j: int) -> void:
 	var teinte := StandardMaterial3D.new()
 	teinte.albedo_color = Color(pilote["couleur"]).lerp(CARTE, 0.55)
 	disque.material_override = teinte
-	disque.position.y = -0.5 if choix["avions"] else -0.1
+	disque.position.y = -0.5 if en_avion else -0.1
 	plateau.add_child(disque)
-	plateau.add_child(Fruit.creer(pilote, vehicule, choix["avions"]))
+	plateau.add_child(Fruit.creer(pilote, vehicule, en_avion))
 	var camera := Camera3D.new()
 	camera.fov = 40.0
 	scene.add_child(camera)
-	camera.position = Vector3(0, 4.0, -11.5) if choix["avions"] else Vector3(0, 2.7, -6.8)
+	camera.position = Vector3(0, 4.0, -11.5) if en_avion else Vector3(0, 2.7, -6.8)
 	camera.look_at(Vector3(0, 1.1, 0))
+	if etroit:
+		camera.keep_aspect = Camera3D.KEEP_WIDTH
+		camera.fov = 46.0 if en_avion else 33.0
 
-	var nombre := Pilotes.PILOTES.size()
-	_selecteur(carte, pilote["nom"], Color(pilote["couleur"]).lightened(0.35), 26,
-		func(): choix["pilotes"][j] = (choix["pilotes"][j] + nombre - 1) % nombre,
-		func(): choix["pilotes"][j] = (choix["pilotes"][j] + 1) % nombre)
-	var garage := Vehicules.VEHICULES.size()
-	_selecteur(carte, vehicule["avion"] if choix["avions"] else vehicule["nom"], TEXTE, 20,
-		func(): choix["vehicules"][j] = (choix["vehicules"][j] + garage - 1) % garage,
-		func(): choix["vehicules"][j] = (choix["vehicules"][j] + 1) % garage)
 
-	# Les points : ceux du pilote, plus ou moins ceux du véhicule.
-	var points := GridContainer.new()
-	points.columns = 2
-	points.add_theme_constant_override("h_separation", 14)
-	points.add_theme_constant_override("v_separation", 6)
-	points.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	carte.add_child(points)
-	for qualite in [["Vitesse", "vitesse"], ["Accélération", "acceleration"], ["Maniabilité", "maniabilite"]]:
-		_texte(points, qualite[0], 15, DISCRET)
-		_pastilles(points, pilote[qualite[1]] + vehicule[qualite[1]], 6, JAUNE)
+# ── Le magasin ───────────────────────────────────────────────
+
+# Le magasin a deux rayons : les voitures et les avions. On paie avec les graines gagnées en course.
+func _montrer_le_magasin(page: Control) -> void:
+	var entete := HBoxContainer.new()
+	entete.add_theme_constant_override("separation", 22)
+	page.add_child(entete)
+	var titre := _texte(entete, "Le magasin", 36, TEXTE, true)
+	titre.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var graines: int = Magasin.graines()
+	_texte(entete, "%d graines" % graines, 20, JAUNE, true).vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_reglette(entete, "Rayon", ["Voitures", "Avions"], 1 if rayon_avions else 0, func(i): rayon_avions = i == 1)
+	var retour := _bouton("Retour au menu", ACCENT, Color.WHITE, 17)
+	retour.pressed.connect(func():
+		au_magasin = false
+		_montrer_menu())
+	entete.add_child(retour)
+
+	var rayon := HBoxContainer.new()
+	rayon.add_theme_constant_override("separation", 12)
+	rayon.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	page.add_child(rayon)
+	var pilote: Dictionary = Pilotes.PILOTES[choix["pilotes"][0]]
+	for numero in Vehicules.VEHICULES.size():
+		var vehicule: Dictionary = Vehicules.VEHICULES[numero]
+		var carte := _carte(rayon, vehicule["avion"] if rayon_avions else vehicule["nom"])
+		carte.get_parent().size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_apercu(carte, pilote, vehicule, rayon_avions, true)
+		for qualite in [["Vitesse", "vitesse"], ["Accélération", "acceleration"], ["Maniabilité", "maniabilite"]]:
+			var plus: int = vehicule[qualite[1]]
+			var ligne := _texte(carte, "%s  %s" % [qualite[0], ("+%d" % plus) if plus > 0 else ("%d" % plus if plus < 0 else "=")], 14, JAUNE if plus > 0 else (ACCENT if plus < 0 else DISCRET))
+			ligne.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		var prix: int = Magasin.prix(numero, rayon_avions)
+		if Magasin.possede(numero, rayon_avions):
+			var a_nous := _bouton("Dans ton garage", CARTE, JAUNE, 16)
+			a_nous.disabled = true
+			a_nous.add_theme_color_override("font_disabled_color", JAUNE)
+			a_nous.add_theme_stylebox_override("disabled", a_nous.get_theme_stylebox("normal"))
+			carte.add_child(a_nous)
+		elif graines >= prix:
+			var acheter := _bouton("Acheter : %d" % prix, ACCENT, Color.WHITE, 16)
+			acheter.pressed.connect(func():
+				Magasin.acheter(numero, rayon_avions)
+				_montrer_menu())
+			carte.add_child(acheter)
+		else:
+			var trop_cher := _bouton("%d  (il manque %d)" % [prix, prix - graines], CARTE_CLAIRE, DISCRET, 15)
+			trop_cher.disabled = true
+			trop_cher.add_theme_color_override("font_disabled_color", DISCRET)
+			trop_cher.add_theme_stylebox_override("disabled", trop_cher.get_theme_stylebox("normal"))
+			carte.add_child(trop_cher)
+
+	var aide := _texte(page, "On gagne des graines en finissant une course (plus on est bien classé, plus on en gagne), en réussissant les défis des circuits et en gagnant des étoiles au défi du jour.", 15, DISCRET)
+	aide.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 
 
 # La carte du circuit : son plan vu d'en haut, aux couleurs de son décor.
@@ -497,6 +586,7 @@ func _nettoyer() -> void:
 # Lance la course choisie dans le menu, ou le défi du jour si on a cliqué dessus.
 func _lancer(demo: bool) -> void:
 	_nettoyer()
+	en_demo = demo
 	course = Course.new()
 	course.demo = demo
 	add_child(course)
@@ -506,10 +596,13 @@ func _lancer(demo: bool) -> void:
 	if joueurs == 2 and humains[0] == humains[1]:
 		humains[1] = (humains[0] + 1) % Pilotes.PILOTES.size()  # pas deux fois le même fruit
 	var circuit: Dictionary = Circuits.CIRCUITS[defi["circuit"] if not defi.is_empty() else choix["circuit"]]
+	# Un défi peut se jouer dans l'autre mode : on ne garde le véhicule choisi que s'il est dans le garage.
+	var en_avion: bool = defi["avions"] if not defi.is_empty() else choix["avions"]
+	var vehicules: Array = choix["vehicules"].map(func(v): return v if Magasin.possede(v, en_avion) else 0)
 	if defi.is_empty():
-		course.demarrer(circuit, humains, choix["vehicules"], choix["tours"], choix["avions"])
+		course.demarrer(circuit, humains, vehicules, choix["tours"], en_avion)
 	else:
-		course.demarrer(circuit, humains, choix["vehicules"], defi["tours"], defi["avions"], defi["regle"]["effet"])
+		course.demarrer(circuit, humains, vehicules, defi["tours"], en_avion, defi["regle"]["effet"])
 	_jouer(circuit.get("musique", ""))
 
 
@@ -547,11 +640,19 @@ func _montrer_resultats(classement: Array) -> void:
 		_texte(ligne, r["nom"], 22, couleur, r["humain"]).size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		_texte(ligne, "%.1f s" % r["temps"] if r["temps"] >= 0.0 else "—", 20, couleur)
 
+	# Les graines : selon la place, et plus pour une course plus longue.
+	var graines := 0
+	if place > 0 and not en_demo and joueur["temps"] >= 0.0:
+		var tours: int = defi["tours"] if not defi.is_empty() else choix["tours"]
+		graines = int(R.GRAINES_PAR_PLACE[mini(place, R.GRAINES_PAR_PLACE.size()) - 1] * tours / 3.0)
+
 	# Le défi du jour : on gagne une, deux ou trois étoiles.
 	if defi.has("epreuve") and place > 0:
 		# Un défi du circuit : réussi ou raté.
 		var gagne: bool = Defi.reussie(defi["epreuve"], joueur)
 		if gagne:
+			if not Defi.reussis(Circuits.CIRCUITS[defi["circuit"]]["nom"]).has(defi["epreuve"]["cle"]):
+				graines += R.GRAINES_DEFI
 			Defi.valider(Circuits.CIRCUITS[defi["circuit"]]["nom"], defi["epreuve"]["cle"])
 		var ligne := HBoxContainer.new()
 		ligne.add_theme_constant_override("separation", 12)
@@ -561,12 +662,18 @@ func _montrer_resultats(classement: Array) -> void:
 		verdict.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		verdict.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	elif not defi.is_empty() and place > 0:
+		var avant: int = Defi.etoiles_du_jour()
 		var etoiles := Defi.noter(place)
+		graines += R.GRAINES_ETOILE * maxi(0, etoiles - avant)
 		var ligne := HBoxContainer.new()
 		ligne.add_theme_constant_override("separation", 12)
 		carte.add_child(ligne)
 		_pastilles(ligne, etoiles, 3, JAUNE, 22)
 		_texte(ligne, Defis.ETOILES[etoiles - 1] + " : %d étoile%s !" % [etoiles, "s" if etoiles > 1 else ""], 17, JAUNE, true)
+
+	if graines > 0:
+		Magasin.gagner(graines)
+		_texte(carte, "+ %d graines  (tu en as %d)" % [graines, Magasin.graines()], 18, JAUNE, true)
 
 	var boutons := HBoxContainer.new()
 	boutons.add_theme_constant_override("separation", 12)

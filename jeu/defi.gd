@@ -37,6 +37,12 @@ static func _lire() -> Dictionary:
 	return contenu if contenu is Dictionary else {}
 
 
+static func _ecrire(tout: Dictionary) -> void:
+	var fichier := FileAccess.open(FICHIER, FileAccess.WRITE)
+	if fichier != null:
+		fichier.store_string(JSON.stringify(tout))
+
+
 static func etoiles_du_jour() -> int:
 	return int(_lire().get(_date(), 0))
 
@@ -46,9 +52,7 @@ static func noter(place: int) -> int:
 	var etoiles := 3 if place == 1 else (2 if place <= 3 else 1)
 	var tout := _lire()
 	tout[_date()] = maxi(etoiles, int(tout.get(_date(), 0)))
-	var fichier := FileAccess.open(FICHIER, FileAccess.WRITE)
-	if fichier != null:
-		fichier.store_string(JSON.stringify(tout))
+	_ecrire(tout)
 	return etoiles
 
 
@@ -56,7 +60,6 @@ static func noter(place: int) -> int:
 static func serie() -> int:
 	var tout := _lire()
 	var jours := 0
-	tout.erase("circuits")
 	var depuis := 0 if tout.has(_date()) else 1  # si on n'a pas encore joué aujourd'hui, la série tient toujours
 	while tout.has(_date(depuis + jours)):
 		jours += 1
@@ -128,6 +131,4 @@ static func valider(nom_du_circuit: String, cle: String) -> void:
 	if not faits.has(cle):
 		faits.append(cle)
 	tout["circuits"][nom_du_circuit] = faits
-	var fichier := FileAccess.open(FICHIER, FileAccess.WRITE)
-	if fichier != null:
-		fichier.store_string(JSON.stringify(tout))
+	_ecrire(tout)

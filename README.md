@@ -53,6 +53,14 @@ trois en gagnant. Les étoiles sont gardées sur l'appareil, et le menu compte l
 Chaque circuit a aussi trois défis à lui, à réussir quand on veut (onglet « Du circuit ») : battre un
 chrono, finir sans toucher d'obstacle, toucher des adversaires avec ses pépins, réussir en avion...
 
+### Le magasin
+
+On gagne des graines en finissant une course (50 pour le premier, 30 pour le deuxième, 20 pour le
+troisième, 10 pour les autres), en réussissant un défi de circuit (100) et en gagnant des étoiles au
+défi du jour (30 par étoile). Le bouton « Magasin » du menu ouvre deux rayons, les voitures et les
+avions. Au début, on a le kart et le monoplan ; les autres s'achètent. Les prix sont dans
+`donnees/vehicules.gd`, les gains dans `donnees/reglages.gd`.
+
 Si le kart sort de la piste, il y est reposé au bout de deux secondes.
 
 ## Modifier le jeu
@@ -75,6 +83,7 @@ Le reste du code est dans `jeu/` :
 - `avion.gd` gère le vol dans le mode Avions (c'est un kart qui vole : il garde les bonus du kart) ;
 - `fruit.gd` dessine le fruit (avec ses bras et ses jambes) et son véhicule ;
 - `course.gd` gère le départ, les touches, les bonus, les écrans des joueurs et le classement ;
+- `magasin.gd` tient le porte-monnaie et le garage ;
 - `defi.gd` tire au sort le défi du jour et garde les étoiles ;
 - `main.gd` gère le menu (avec l'aperçu du pilote et le plan du circuit), le classement et la musique.
 

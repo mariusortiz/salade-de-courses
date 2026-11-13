@@ -33,6 +33,11 @@ const COULEUR_ANNEAUX := ["#ffffff", "#ffb300", "#ffee58"]  # normal, turbo, le 
 const OBSTACLES_VITESSE := 1.2  # la vitesse de ceux qui bougent
 const OBSTACLES_AVIONS := 3     # en avion : un obstacle tous les 3 anneaux
 
+# Les graines : la monnaie du magasin
+const GRAINES_PAR_PLACE := [50, 30, 20, 10, 10, 10]  # ce qu'on gagne en finissant 1er, 2e, 3e... (pour 3 tours)
+const GRAINES_DEFI := 100     # pour un défi de circuit réussi la première fois
+const GRAINES_ETOILE := 30    # pour chaque nouvelle étoile du défi du jour
+
 # Le saut
 const SAUT_FORCE := 6.5       # plus grand = on saute plus haut (au-dessus de 7, on passe par-dessus les barrières)
 
