@@ -23,6 +23,7 @@ var obstacles: Array = [] # les obstacles : les toucher fait faire un tête-à-q
 var horloge := 0.0
 var raccourcis: Array = []  # les raccourcis : leur courbe, où ils commencent et combien de route ils remplacent
 var pas_de_raccourci: Array[Vector3] = []  # un point de raccourci tous les 1,5 mètre
+var pas_secrets: Array[bool] = []  # pour chacun de ces points : est-il sur un passage secret ?
 var graines: Array = []   # les graines à ramasser pendant une chasse aux graines
 var regle := ""           # la règle du défi du jour, s'il y en a une (voir donnees/defis.gd)
 var niveau_ordis: float = R.NIVEAU_ORDIS
@@ -74,7 +75,9 @@ func construire(def: Dictionary, aerien := false) -> void:
 	_sol()
 	if not aerien:
 		for bouts in def.get("raccourcis", []):
-			_tracer_un_raccourci(float(bouts[0]) * longueur, float(bouts[1]) * longueur)
+			_tracer_un_raccourci(float(bouts[0]) * longueur, float(bouts[1]) * longueur, false)
+		for bouts in def.get("secrets", []):
+			_tracer_un_raccourci(float(bouts[0]) * longueur, float(bouts[1]) * longueur, true)
 	_route()
 	_piliers()
 	for numero in raccourcis.size():
@@ -138,8 +141,11 @@ func repere(distance: float) -> Transform3D:
 func _route() -> void:
 	var route := SurfaceTool.new()
 	var murs := SurfaceTool.new()
+	var faux_murs := SurfaceTool.new()  # devant un passage secret : on les voit, mais on passe à travers !
 	route.begin(Mesh.PRIMITIVE_TRIANGLES)
 	murs.begin(Mesh.PRIMITIVE_TRIANGLES)
+	faux_murs.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var des_faux := false
 
 	var troncons := int(ceil(longueur / 2.0))
 	var demi := largeur / 2.0
@@ -169,8 +175,16 @@ func _route() -> void:
 			var pb := b.origin + b.basis.x * demi * cote
 			var oa := pa + a.basis.x * 0.4 * cote
 			var ob := pb + b.basis.x * 0.4 * cote
-			if _sur_un_raccourci((pa + pb) / 2.0):
-				continue  # pas de barrière devant l'entrée ou la sortie d'un raccourci
+			var passage := _sur_un_raccourci((pa + pb) / 2.0)
+			if passage == 2:
+				# Un passage secret : la barrière a l'air vraie, en à peine plus foncé.
+				var fausse := rouge_blanc.darkened(0.1)
+				_carre(faux_murs, pa, pa + h, pb + h, pb, -a.basis.x * cote, fausse)
+				_carre(faux_murs, pa + h, oa + h, ob + h, pb + h, Vector3.UP, fausse.darkened(0.15))
+				_carre(faux_murs, oa, oa + h, ob + h, ob, a.basis.x * cote, fausse)
+				des_faux = true
+			if passage > 0:
+				continue  # pas de vraie barrière devant l'entrée ou la sortie d'un raccourci
 			_carre(murs, pa, pa + h, pb + h, pb, -a.basis.x * cote, rouge_blanc)
 			_carre(murs, pa + h, oa + h, ob + h, pb + h, Vector3.UP, rouge_blanc.darkened(0.15))
 			_carre(murs, oa, oa + h, ob + h, ob, a.basis.x * cote, rouge_blanc)
@@ -187,6 +201,12 @@ func _route() -> void:
 	peinture.vertex_color_use_as_albedo = true
 	peinture.cull_mode = BaseMaterial3D.CULL_DISABLED
 	_poser(murs.commit(), "mur", peinture).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	if des_faux:
+		var trompe_l_oeil := MeshInstance3D.new()
+		trompe_l_oeil.mesh = faux_murs.commit()
+		trompe_l_oeil.material_override = peinture
+		trompe_l_oeil.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(trompe_l_oeil)
 
 
 func _carre(outil: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3, normale: Vector3, couleur: Color,
@@ -226,7 +246,8 @@ func _solide(forme: Shape3D, ou: Transform3D, sol: String, raccourci := -1) -> v
 # ── Les raccourcis ───────────────────────────────────────────
 
 # Un raccourci part de la route, coupe tout droit, et la rejoint plus loin.
-func _tracer_un_raccourci(de: float, a: float) -> void:
+# Un passage secret, c'est pareil, mais sans panneau et caché derrière une fausse barrière.
+func _tracer_un_raccourci(de: float, a: float, secret: bool) -> void:
 	var debut := repere(de)
 	var bout := repere(a)
 	var corde := bout.origin - debut.origin
@@ -237,18 +258,21 @@ func _tracer_un_raccourci(de: float, a: float) -> void:
 	trace.bake_interval = 1.0
 	trace.add_point(debut.origin, Vector3.ZERO, sortie)
 	trace.add_point(bout.origin, -entree, Vector3.ZERO)
-	raccourcis.append({"courbe": trace, "longueur": trace.get_baked_length(), "de": de, "remplace": a - de})
+	raccourcis.append({"courbe": trace, "longueur": trace.get_baked_length(), "de": de, "remplace": a - de, "secret": secret})
 	var d := 0.0
 	while d < trace.get_baked_length():
 		pas_de_raccourci.append(trace.sample_baked(d))
+		pas_secrets.append(secret)
 		d += 1.5
 
 
-func _sur_un_raccourci(ou: Vector3) -> bool:
-	for p in pas_de_raccourci:
+# 0 = pas de raccourci ici, 1 = un raccourci, 2 = un passage secret.
+func _sur_un_raccourci(ou: Vector3) -> int:
+	for i in pas_de_raccourci.size():
+		var p := pas_de_raccourci[i]
 		if absf(p.y - ou.y) < 2.0 and Vector2(p.x - ou.x, p.z - ou.z).length() < LARGEUR_RACCOURCI / 2.0 + 0.6:
-			return true
-	return false
+			return 2 if pas_secrets[i] else 1
+	return 0
 
 
 func _construire_un_raccourci(numero: int) -> void:
@@ -294,6 +318,11 @@ func _construire_un_raccourci(numero: int) -> void:
 	peinture.cull_mode = BaseMaterial3D.CULL_DISABLED
 	_poser(murs.commit(), "mur", peinture).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
+	# Dans un passage secret, pas de panneau : une cagette à bonus récompense celui qui l'a trouvé.
+	if raccourcis[numero]["secret"]:
+		var milieu := _repere_de(trace, long / 2.0)
+		_cagette(milieu.origin + milieu.basis.y * 1.0)
+		return
 	# Un panneau à l'entrée.
 	var entree := _repere_de(trace, minf(22.0, long * 0.3))
 	var panneau := Label3D.new()
@@ -601,6 +630,8 @@ func _obstacles(def: Dictionary, aerien: bool, decorateur: RefCounted, decor: St
 		numero += 1
 	# Un obstacle qui va et vient au milieu de chaque raccourci : il faut le mériter !
 	for raccourci in raccourcis:
+		if raccourci["secret"]:
+			continue
 		var milieu := _repere_de(raccourci["courbe"], raccourci["longueur"] / 2.0)
 		_obstacle(decorateur, decor, milieu.origin + Vector3.UP * 1.3, milieu.basis.x, LARGEUR_RACCOURCI / 2.0 - 1.9, 0.0, 999.0, false)
 

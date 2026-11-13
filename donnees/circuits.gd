@@ -19,6 +19,8 @@
 #               Une fois sur deux ils ne bougent pas, sinon ils traversent la route.
 #    raccourcis des passages étroits qui coupent tout droit : [où il commence, où il finit].
 #               Il faut que la route fasse un détour entre les deux, sinon on ne gagne rien.
+#    secrets    des passages secrets : pareil, mais sans panneau, pas sur le plan, et cachés
+#               derrière une fausse barrière qu'on traverse. Dedans, une cagette à bonus.
 #    musique    le fichier de musique du circuit, dans le dossier musique/
 #    defis      les trois défis du circuit (si on n'écrit rien, le jeu en choisit trois).
 #               Les défis possibles sont dans donnees/defis.gd.
@@ -41,6 +43,7 @@ const CIRCUITS := [
 		"tremplins": [0.64],
 		"bonus": [0.15, 0.4, 0.85],
 		"raccourcis": [[0.455, 0.796]],
+		"secrets": [[0.19, 0.36]],
 		"musique": "res://musique/course-1.mp3",
 		"points": [
 			Vector3(0, 0, 0),
@@ -62,6 +65,7 @@ const CIRCUITS := [
 		"turbos": [0.0, 0.62],
 		"tremplins": [],
 		"bonus": [0.12, 0.4, 0.8],
+		"secrets": [[0.32, 0.46]],
 		"musique": "res://musique/course-2.mp3",
 		"points": [
 			Vector3(-50, 0, 0),
@@ -115,7 +119,8 @@ const CIRCUITS := [
 		"turbos": [0.03],
 		"tremplins": [],
 		"bonus": [0.15, 0.5, 0.8],
-		"raccourcis": [[0.363, 0.588]],
+		"raccourcis": [[0.343, 0.556]],
+		"secrets": [[0.69, 0.93]],
 		"musique": "res://musique/montagne.ogg",
 		"points": [
 			Vector3(119, 0, 0),
@@ -131,7 +136,7 @@ const CIRCUITS := [
 			Vector3(-81, 20.5, -62),
 			Vector3(-45, 16.6, -83),
 			Vector3(0, 12, -80),
-			Vector3(35, 7.4, -65),
+			Vector3(55, 7.4, -100),  # un autre détour, pour le passage secret
 			Vector3(67, 3.5, -51),
 			Vector3(102, 0.9, -32),
 		],
@@ -145,6 +150,7 @@ const CIRCUITS := [
 		"tremplins": [],
 		"bonus": [0.2, 0.6, 0.85],
 		"raccourcis": [[0.531, 0.813]],
+		"secrets": [[0.10, 0.36]],
 		"musique": "res://musique/grotte.ogg",
 		"points": [
 			Vector3(114, 3, 0),
@@ -174,6 +180,7 @@ const CIRCUITS := [
 		"tremplins": [],
 		"bonus": [0.25, 0.5, 0.85],
 		"raccourcis": [[0.404, 0.78]],
+		"secrets": [[0.04, 0.32]],
 		"musique": "res://musique/pizza.ogg",
 		"points": [
 			Vector3(87, 0, 0),
@@ -201,15 +208,16 @@ const CIRCUITS := [
 		"turbos": [0.06, 0.55],
 		"tremplins": [],
 		"bonus": [0.2, 0.45, 0.8],
-		"raccourcis": [[0.481, 0.764]],
+		"raccourcis": [[0.497, 0.771]],
+		"secrets": [[0.06, 0.35]],
 		"musique": "res://musique/aquarium.ogg",
 		"points": [
 			Vector3(105, 0, 26),
 			Vector3(97, 0.9, 38),
 			Vector3(74, 3, 35),
-			Vector3(40, 5.1, 28),
-			Vector3(0, 6, 24),
-			Vector3(-40, 5.1, 28),
+			Vector3(41, 5.1, 50),
+			Vector3(3, 6, 74),  # un autre détour, pour le passage secret
+			Vector3(-39, 5.1, 50),
 			Vector3(-74, 3, 35),
 			Vector3(-97, 0.9, 38),
 			Vector3(-105, 0, 26),
@@ -231,6 +239,7 @@ const CIRCUITS := [
 		"tremplins": [],
 		"bonus": [0.2, 0.5, 0.8],
 		"raccourcis": [[0.292, 0.598]],
+		"secrets": [[0.74, 0.95]],
 		"musique": "res://musique/frigo.ogg",
 		"points": [
 			Vector3(0, 0, 55),
@@ -259,7 +268,8 @@ const CIRCUITS := [
 		"turbos": [0.05, 0.5],
 		"tremplins": [],
 		"bonus": [0.15, 0.4, 0.7],
-		"raccourcis": [[0.327, 0.612]],
+		"raccourcis": [[0.308, 0.576]],
+		"secrets": [[0.64, 0.83]],
 		"musique": "res://musique/potager.ogg",
 		"points": [
 			Vector3(70, 2.1, 34),
@@ -273,7 +283,7 @@ const CIRCUITS := [
 			Vector3(-66, 2.9, -51),
 			Vector3(-41, 1.8, -77),
 			Vector3(-2, 0, -71),
-			Vector3(24, 1.5, -51),
+			Vector3(43, 1.5, -86),  # un autre détour, pour le passage secret
 			Vector3(49, 3, -41),
 			Vector3(82, 1.2, -26),
 			Vector3(94, 0.1, 7),

@@ -73,6 +73,11 @@ Sur sept circuits, la route fait un détour et un passage étroit coupe tout dro
 « RACCOURCI » le signale, et il est en pointillé sur le plan du menu. Il fait gagner du temps, mais un
 obstacle va et vient au milieu. Les raccourcis s'écrivent dans `donnees/circuits.gd`.
 
+Il y a aussi des **passages secrets**, sur tous les circuits sauf La Comète. Aucun panneau ne les
+montre et ils ne sont pas sur le plan : ils sont cachés derrière une fausse barrière, un tout petit
+peu plus foncée que les autres, qu'on traverse. Dedans, une cagette à bonus attend celui qui l'a
+trouvé. Ils s'écrivent au même endroit, à la ligne `secrets`.
+
 ### Le magasin
 
 On gagne des graines en finissant une course (50 pour le premier, 30 pour le deuxième, 20 pour le
@@ -89,7 +94,7 @@ Six fichiers sont faits pour être changés. Chacun commence par son mode d'empl
 
 | Fichier | Ce qu'on y change |
 | --- | --- |
-| `donnees/circuits.gd` | Les circuits : la liste des points par où passe la route (avec leur hauteur), les turbos, les tremplins, les cagettes à bonus, les obstacles, les raccourcis, la musique |
+| `donnees/circuits.gd` | Les circuits : la liste des points par où passe la route (avec leur hauteur), les turbos, les tremplins, les cagettes à bonus, les obstacles, les raccourcis, les passages secrets, la musique |
 | `donnees/pilotes.gd` | Les fruits : nom, forme, motif de la peau, couleurs, vitesse, accélération, maniabilité, modèle 3D |
 | `donnees/vehicules.gd` | Les véhicules : nom, forme, et ce qu'ils ajoutent ou enlèvent en vitesse, accélération, maniabilité |
 | `donnees/modes.gd` | Les épreuves : leur nom et leur règle |

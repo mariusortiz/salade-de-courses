@@ -418,6 +418,7 @@ func _avancer(dt: float) -> void:
 
 	# Où en est-on sur le tour ?
 	var p: float = piste.courbe.get_closest_offset(ici)
+	var venait_d_un_raccourci := sur_raccourci
 	sur_raccourci = au_sol and touche["collider"].has_meta("raccourci")
 	if sur_raccourci:
 		# Sur un raccourci, on avance plus vite que la route : on compte la route qu'il remplace.
@@ -425,7 +426,9 @@ func _avancer(dt: float) -> void:
 		var fait: float = raccourci["courbe"].get_closest_offset(ici) / raccourci["longueur"]
 		p = fposmod(raccourci["de"] + fait * raccourci["remplace"], piste.longueur)
 	var avance := wrapf(p - position_piste, -piste.longueur / 2.0, piste.longueur / 2.0)
-	var perdu := absf(avance) > 15.0 or ici.y < -5.0 or (au_sol and sol == "herbe")
+	# Entre la route et un raccourci, le compte peut sauter un peu : on le permet.
+	var saut_permis := 30.0 if sur_raccourci or venait_d_un_raccourci else 15.0
+	var perdu := absf(avance) > saut_permis or ici.y < -5.0 or (au_sol and sol == "herbe")
 	if not perdu:
 		distance += avance
 		position_piste = p

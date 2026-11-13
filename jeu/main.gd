@@ -42,6 +42,7 @@ var essai_derapage := ""
 var essai_bonus := ""
 var essai_trace := 0.0
 var essai_raccourci := ""
+var essai_secret := false
 var musique := AudioStreamPlayer.new()
 
 
@@ -52,6 +53,8 @@ func _ready() -> void:
 	for option in OS.get_cmdline_user_args():
 		if option == "--simulation":
 			essai_circuit = 0
+		elif option.begins_with("--simulation="):
+			essai_circuit = int(option.trim_prefix("--simulation="))  # on commence à ce circuit
 		elif option.begins_with("--capture="):
 			capture = option.trim_prefix("--capture=")
 		elif option.begins_with("--essai-bonus="):
@@ -84,6 +87,8 @@ func _ready() -> void:
 			choix["vehicules"] = [int(option.trim_prefix("--vehicule=")), int(option.trim_prefix("--vehicule="))]
 		elif option.begins_with("--circuit="):
 			choix["circuit"] = int(option.trim_prefix("--circuit="))
+		elif option == "--secret":
+			essai_secret = true
 		elif option.begins_with("--essai-raccourci="):
 			essai_raccourci = option.trim_prefix("--essai-raccourci=")
 		elif option.begins_with("--epreuve="):
@@ -773,7 +778,7 @@ func _process(dt: float) -> void:
 		get_tree().quit()
 	if essai_raccourci != "" and course != null and not course.piste.raccourcis.is_empty():
 		var kart = course.vues[0]["kart"]
-		var raccourci: Dictionary = course.piste.raccourcis[0]
+		var raccourci: Dictionary = course.piste.raccourcis[-1 if essai_secret else 0]
 		if course.temps >= 0.5 and capture == "":
 			capture = "pose"
 			var entree: Transform3D = course.piste._repere_de(raccourci["courbe"], raccourci["longueur"] * 0.25)
@@ -786,7 +791,7 @@ func _process(dt: float) -> void:
 			print("raccourci de %.0f m qui remplace %.0f m de route, de %.0f à %.0f" % [raccourci["longueur"], raccourci["remplace"], raccourci["de"], raccourci["de"] + raccourci["remplace"]])
 		if course.temps >= essai_trace:
 			essai_trace += 0.5
-			print("t=%.1f position sur le tour=%.0f distance=%.0f vitesse=%.0f retours=%d touches=%d" % [course.temps, kart.position_piste, kart.distance, kart.vitesse, kart.retours, kart.touches])
+			print("t=%.1f position sur le tour=%.0f distance=%.0f vitesse=%.0f retours=%d touches=%d au_sol=%s raccourci=%s hauteur=%.1f" % [course.temps, kart.position_piste, kart.distance, kart.vitesse, kart.retours, kart.touches, kart.au_sol, kart.sur_raccourci, kart.boule.global_position.y])
 		if course.temps > 2.0 and capture == "pose":
 			capture = "fait"
 			get_viewport().get_texture().get_image().save_png(essai_raccourci)
