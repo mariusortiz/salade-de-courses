@@ -83,7 +83,7 @@ trouvé. Ils s'écrivent au même endroit, à la ligne `secrets`.
 On gagne des graines en finissant une course (50 pour le premier, 30 pour le deuxième, 20 pour le
 troisième, 10 pour les autres), en réussissant un défi de circuit (100) et en gagnant des étoiles au
 défi du jour (30 par étoile). Le bouton « Magasin » du menu ouvre deux rayons, les voitures et les
-avions (kart, buggy, bolide, tracteur, cagette, et quatre deux-roues : moto, scooter, moto tout-terrain, moto de course). Au début, on a le kart, la moto et leurs avions ; les autres s'achètent. Les prix sont dans
+avions (kart, buggy, bolide, tracteur, cagette, et quatre deux-roues : moto, scooter, moto tout-terrain, moto de course, et deux planches à roulettes : skateboard et longboard). Au début, on a le kart, la moto et leurs avions ; les autres s'achètent. Les prix sont dans
 `donnees/vehicules.gd`, les gains dans `donnees/reglages.gd`.
 
 Si le kart sort de la piste, il y est reposé au bout de deux secondes.

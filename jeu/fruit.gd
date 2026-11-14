@@ -19,7 +19,8 @@ static func creer(pilote: Dictionary, vehicule: Dictionary = {}, en_avion := fal
 	else:
 		_kart(kart, Color(pilote["kart"]), vehicule.get("forme", "kart"))
 	_plaque(kart, pilote)
-	_pilote(kart, pilote)
+	# Sur une planche à roulettes, le fruit est debout (mais assis dans la planche volante).
+	_pilote(kart, pilote, not en_avion and vehicule.get("forme", "kart") in ["skate", "longboard"])
 	return kart
 
 
@@ -35,13 +36,15 @@ static func _kart(kart: Node3D, couleur: Color, forme: String) -> void:
 
 	# Ce que tous les véhicules ont : le plancher (étroit sur une moto), le siège et le volant.
 	var deux_roues := forme in ["moto", "scooter", "moto-cross", "moto-course"]
-	_ajouter(kart, _boite(Vector3(0.45 if deux_roues else 1.15, 0.12, 2.6)), sombre, Vector3(0, 0.3, 0))
-	_ajouter(kart, _boite(Vector3(0.85, 0.8, 0.14)), cuir, Vector3(0, 0.78, 0.82)).rotation_degrees.x = -12
-	_membre(kart, Vector3(0, 0.55, -0.6), Vector3(0, 0.95, -0.25), 0.04, metal)
-	var cercle := TorusMesh.new()
-	cercle.inner_radius = 0.15
-	cercle.outer_radius = 0.22
-	_ajouter(kart, cercle, sombre, Vector3(0, 0.97, -0.22)).rotation.x = 0.72
+	# Sur une planche à roulettes, rien de tout ça : le pilote est debout dessus.
+	if not forme in ["skate", "longboard"]:
+		_ajouter(kart, _boite(Vector3(0.45 if deux_roues else 1.15, 0.12, 2.6)), sombre, Vector3(0, 0.3, 0))
+		_ajouter(kart, _boite(Vector3(0.85, 0.8, 0.14)), cuir, Vector3(0, 0.78, 0.82)).rotation_degrees.x = -12
+		_membre(kart, Vector3(0, 0.55, -0.6), Vector3(0, 0.95, -0.25), 0.04, metal)
+		var cercle := TorusMesh.new()
+		cercle.inner_radius = 0.15
+		cercle.outer_radius = 0.22
+		_ajouter(kart, cercle, sombre, Vector3(0, 0.97, -0.22)).rotation.x = 0.72
 
 	# Les roues : [rayon devant, rayon derrière, épaisseur, écart sur les côtés, z devant, z derrière]
 	var roues := [0.34, 0.34, 0.32, 0.84, -0.95, 0.85]
@@ -81,6 +84,22 @@ static func _kart(kart: Node3D, couleur: Color, forme: String) -> void:
 				_ajouter(kart, _boite(Vector3(0.5, 0.08, 1.5)), peinture, Vector3(x, 1.4, 0.7))  # les garde-boue
 			_ajouter(kart, _boite(Vector3(1.0, 0.5, 0.5)), peinture, Vector3(0, 0.6, 1.2))
 			_ajouter(kart, _boule(0.14), _matiere(Color("#ffb300")), Vector3(0, 1.3, 1.0))  # le gyrophare
+		"skate", "longboard":
+			# Une planche arrondie aux deux bouts, quatre petites roues, et le nez qui remonte.
+			var long := forme == "longboard"
+			roues = [0.2, 0.2, 0.18, 0.55, -1.25, 1.15] if long else [0.16, 0.16, 0.16, 0.5, -0.95, 0.85]
+			var plateau := _ajouter(kart, _capsule(0.6, 3.6 if long else 2.9), bois if long else rayee, Vector3(0, 0.42, 0))
+			plateau.rotation_degrees.x = 90
+			plateau.scale = Vector3(1, 1, 0.1)
+			_ajouter(kart, _boite(Vector3(1.0, 0.03, 1.7)), sombre, Vector3(0, 0.49, 0.0))  # l'antidérapant, sous les pieds
+			if long:
+				_ajouter(kart, _boite(Vector3(0.16, 0.02, 3.0)), peinture, Vector3(0, 0.485, -0.1))  # une bande de couleur
+			else:
+				var queue := _ajouter(kart, _boite(Vector3(0.95, 0.06, 0.5)), rayee, Vector3(0, 0.52, 1.5))  # l'arrière relevé
+				queue.rotation_degrees.x = 22
+			for z: float in [roues[4], roues[5]]:
+				_ajouter(kart, _boite(Vector3(1.0, 0.1, 0.16)), metal, Vector3(0, roues[0], z))  # l'axe des roues
+				_ajouter(kart, _boite(Vector3(0.3, 0.2, 0.3)), metal, Vector3(0, roues[0] + 0.12, z))
 		"scooter":
 			# Deux petites roues, un grand tablier devant, un plancher plat et un coffre derrière.
 			roues = [0.32, 0.32, 0.26, 0.0, -1.3, 1.2]
@@ -253,6 +272,13 @@ static func _avion(avion: Node3D, couleur: Color, forme: String) -> void:
 			for cote: float in [-1.0, 1.0]:
 				_ajouter(avion, _boite(Vector3(2.6, 0.1, 1.1)), peinture, Vector3(cote * 1.7, 0.75, 0.0)).rotation.z = cote * 0.35
 				_ajouter(avion, _boite(Vector3(0.1, 0.7, 1.1)), sombre, Vector3(cote * 2.9, 1.45, 0.0))
+		"skate", "longboard":
+			# La planche volante : une seule grande aile arrondie, comme une planche de surf en travers.
+			var envergure := 4.2 if forme == "longboard" else 3.2
+			var aile := _ajouter(avion, _boule(1.0), peinture, Vector3(0, 0.35, -0.1))
+			aile.scale = Vector3(envergure, 0.07, 0.85)
+			for cote: float in [-1.0, 1.0]:
+				_ajouter(avion, _boite(Vector3(0.08, 0.5, 0.7)), sombre, Vector3(cote * (envergure - 0.5), 0.6, 0.0))
 		"scooter":
 			# Le scooter volant : deux ailes toutes rondes, comme des pétales.
 			for cote: float in [-1.0, 1.0]:
@@ -307,12 +333,14 @@ static func _roue(rayon: float, epaisseur: float) -> CylinderMesh:
 
 # ── Le fruit ─────────────────────────────────────────────────
 
-static func _pilote(kart: Node3D, pilote: Dictionary) -> void:
+static func _pilote(kart: Node3D, pilote: Dictionary, debout := false) -> void:
 	var couleur := Color(pilote["couleur"])
 	var taille: float = pilote.get("taille", 1.0)
 	var fruit := Node3D.new()
 	fruit.scale = Vector3.ONE * taille
 	fruit.position = Vector3(0, 0.55 + 0.65 * taille, 0.3)
+	if debout:
+		fruit.position = Vector3(0, 1.2 + 0.65 * taille, 0.0)
 	kart.add_child(fruit)
 
 	var peau := _peau(couleur, pilote.get("motif", "uni"))
@@ -387,6 +415,21 @@ static func _pilote(kart: Node3D, pilote: Dictionary) -> void:
 	var membre := _matiere(couleur.darkened(0.3))
 	var chaussure := _matiere(Color(pilote["kart"]).lightened(0.2))
 	var centre := fruit.position
+	if debout:
+		# Debout sur la planche : les bras écartés pour garder l'équilibre, un pied devant, un pied derrière.
+		for cote: float in [-1.0, 1.0]:
+			var epaule := centre + Vector3(cote * large, 0.05, 0.0) * taille
+			var main := epaule + Vector3(cote * 0.75, 0.2, -0.1 * cote)
+			_membre(kart, epaule, (epaule + main) / 2.0 + Vector3(0, -0.12, 0), 0.07, membre)
+			_membre(kart, (epaule + main) / 2.0 + Vector3(0, -0.12, 0), main, 0.07, membre)
+			_ajouter(kart, _boule(0.12), blanc, main)  # le gant
+			var hanche := centre + Vector3(cote * 0.25, -0.5, cote * 0.1) * taille
+			var pied := Vector3(cote * 0.12, 0.6, cote * 0.6)
+			var genou := (hanche + pied) / 2.0 + Vector3(cote * 0.12, 0, cote * 0.08)
+			_membre(kart, hanche, genou, 0.08, membre)
+			_membre(kart, genou, pied, 0.08, membre)
+			_ajouter(kart, _boule(0.15), chaussure, pied + Vector3(0, 0.02, 0)).scale = Vector3(1.5, 0.9, 0.9)
+		return
 	for cote: float in [-1.0, 1.0]:
 		var epaule := centre + Vector3(cote * large, 0.05, -0.15) * taille
 		var main := Vector3(cote * 0.2, 0.99, -0.26)

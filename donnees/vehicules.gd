@@ -5,7 +5,7 @@
 #    nom           le nom affiché dans le menu
 #    avion         son nom dans le mode Avions, où chaque véhicule devient un avion
 #    forme         "kart", "buggy", "bolide", "tracteur", "cagette", "moto", "scooter",
-#                  "moto-cross" ou "moto-course"
+#                  "moto-cross", "moto-course", "skate" ou "longboard"
 #                  (les formes sont fabriquées dans jeu/fruit.gd)
 #    prix          son prix au magasin, en graines (0 = on l'a dès le début)
 #    prix_avion    le prix de l'avion
@@ -26,4 +26,6 @@ const VEHICULES := [
 	{"nom": "Scooter", "avion": "Scooter volant", "forme": "scooter", "vitesse": -2, "acceleration": 1, "maniabilite": 1, "prix": 150, "prix_avion": 150},
 	{"nom": "Moto tout-terrain", "avion": "Moto des nuages", "forme": "moto-cross", "vitesse": 0, "acceleration": 1, "maniabilite": -1, "prix": 300, "prix_avion": 300},
 	{"nom": "Moto de course", "avion": "Moto fusée", "forme": "moto-course", "vitesse": 2, "acceleration": -1, "maniabilite": -1, "prix": 450, "prix_avion": 450},
+	{"nom": "Skateboard", "avion": "Planche volante", "forme": "skate", "vitesse": -2, "acceleration": 0, "maniabilite": 2, "prix": 100, "prix_avion": 100},
+	{"nom": "Longboard", "avion": "Planche des nuages", "forme": "longboard", "vitesse": 1, "acceleration": -2, "maniabilite": 1, "prix": 250, "prix_avion": 250},
 ]
