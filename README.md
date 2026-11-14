@@ -67,6 +67,22 @@ Le menu propose cinq façons de jouer :
 La chasse aux graines et la patate chaude se jouent en kart seulement. Les noms et les règles sont dans
 `donnees/modes.gd`, les durées dans `donnees/reglages.gd`.
 
+### Le mode Skate
+
+Dans le menu, le mode **Skate** emmène un ou deux joueurs dans le skatepark des fruits. On n'y fait
+pas la course : on a deux minutes pour marquer le plus de points en faisant des figures.
+
+- **Toupie** : en l'air, gauche ou droite pour tourner sur soi-même.
+- **Salto** : en l'air, haut ou bas.
+- **Tonneau** et **Attrapé** : en l'air, avec leurs boutons.
+- **Glissade** : retomber sur une barre.
+- **Grand saut** : monter très haut, par exemple sur les rampes du tour.
+
+Tout ce qu'on enchaîne sans retoucher le sol forme un combo : les points sont multipliés par le
+nombre de figures. Il faut finir ses figures avant de retomber, sinon c'est la chute et le combo est
+perdu. Le skatepark (rampes, tremplins, bosses, barres), les figures et leurs points s'écrivent dans
+`donnees/skate.gd`.
+
 ### Les raccourcis
 
 Sur sept circuits, la route fait un détour et un passage étroit coupe tout droit : un panneau
@@ -83,7 +99,7 @@ trouvé. Ils s'écrivent au même endroit, à la ligne `secrets`.
 On gagne des graines en finissant une course (50 pour le premier, 30 pour le deuxième, 20 pour le
 troisième, 10 pour les autres), en réussissant un défi de circuit (100) et en gagnant des étoiles au
 défi du jour (30 par étoile). Le bouton « Magasin » du menu ouvre deux rayons, les voitures et les
-avions (kart, buggy, bolide, tracteur, cagette, et quatre deux-roues : moto, scooter, moto tout-terrain, moto de course, et deux planches à roulettes : skateboard et longboard). Au début, on a le kart, la moto et leurs avions ; les autres s'achètent. Les prix sont dans
+avions (kart, buggy, bolide, tracteur, cagette, et quatre deux-roues : moto, scooter, moto tout-terrain, moto de course). Au début, on a le kart, la moto et leurs avions ; les autres s'achètent. Les prix sont dans
 `donnees/vehicules.gd`, les gains dans `donnees/reglages.gd`.
 
 Si le kart sort de la piste, il y est reposé au bout de deux secondes.
@@ -94,6 +110,7 @@ Six fichiers sont faits pour être changés. Chacun commence par son mode d'empl
 
 | Fichier | Ce qu'on y change |
 | --- | --- |
+| `donnees/skate.gd` | Le mode Skate : la durée, les figures et leurs points, et tout ce qu'on pose dans le skatepark |
 | `donnees/circuits.gd` | Les circuits : la liste des points par où passe la route (avec leur hauteur), les turbos, les tremplins, les cagettes à bonus, les obstacles, les raccourcis, les passages secrets, la musique |
 | `donnees/pilotes.gd` | Les fruits : nom, forme, motif de la peau, couleurs, vitesse, accélération, maniabilité, modèle 3D |
 | `donnees/vehicules.gd` | Les véhicules : nom, forme, et ce qu'ils ajoutent ou enlèvent en vitesse, accélération, maniabilité |

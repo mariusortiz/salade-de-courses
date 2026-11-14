@@ -18,9 +18,11 @@ static func creer(pilote: Dictionary, vehicule: Dictionary = {}, en_avion := fal
 		_avion(kart, Color(pilote["kart"]), vehicule.get("forme", "kart"))
 	else:
 		_kart(kart, Color(pilote["kart"]), vehicule.get("forme", "kart"))
-	_plaque(kart, pilote)
-	# Sur une planche à roulettes, le fruit est debout (mais assis dans la planche volante).
-	_pilote(kart, pilote, not en_avion and vehicule.get("forme", "kart") in ["skate", "longboard"])
+	# Sur une planche à roulettes, le fruit est debout, et il n'y a pas de plaque à numéro.
+	var debout: bool = not en_avion and vehicule.get("forme", "kart") in ["skate", "longboard"]
+	if not debout:
+		_plaque(kart, pilote)
+	_pilote(kart, pilote, debout)
 	return kart
 
 
