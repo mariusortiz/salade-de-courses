@@ -331,8 +331,11 @@ func _montrer_le_magasin(page: Control) -> void:
 		_montrer_menu())
 	entete.add_child(retour)
 
-	var rayon := HBoxContainer.new()
-	rayon.add_theme_constant_override("separation", 8)
+	# Les véhicules sont rangés sur deux étagères.
+	var rayon := GridContainer.new()
+	rayon.columns = int(ceil(Vehicules.VEHICULES.size() / 2.0))
+	rayon.add_theme_constant_override("h_separation", 8)
+	rayon.add_theme_constant_override("v_separation", 8)
 	rayon.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	page.add_child(rayon)
 	var pilote: Dictionary = Pilotes.PILOTES[choix["pilotes"][0]]
@@ -340,11 +343,16 @@ func _montrer_le_magasin(page: Control) -> void:
 		var vehicule: Dictionary = Vehicules.VEHICULES[numero]
 		var carte := _carte(rayon, vehicule["avion"] if rayon_avions else vehicule["nom"])
 		carte.get_parent().size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		carte.get_parent().size_flags_vertical = Control.SIZE_EXPAND_FILL
 		_apercu(carte, pilote, vehicule, rayon_avions, true)
-		for qualite in [["Vitesse", "vitesse"], ["Accélération", "acceleration"], ["Maniabilité", "maniabilite"]]:
+		# Ses forces et ses faiblesses, sur une seule ligne pour laisser la place à l'image.
+		var qualites := HBoxContainer.new()
+		qualites.alignment = BoxContainer.ALIGNMENT_CENTER
+		qualites.add_theme_constant_override("separation", 10)
+		carte.add_child(qualites)
+		for qualite in [["Vit.", "vitesse"], ["Acc.", "acceleration"], ["Man.", "maniabilite"]]:
 			var plus: int = vehicule[qualite[1]]
-			var ligne := _texte(carte, "%s  %s" % [qualite[0], ("+%d" % plus) if plus > 0 else ("%d" % plus if plus < 0 else "=")], 14, JAUNE if plus > 0 else (ACCENT if plus < 0 else DISCRET))
-			ligne.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			_texte(qualites, "%s %s" % [qualite[0], ("+%d" % plus) if plus > 0 else ("%d" % plus if plus < 0 else "=")], 13, JAUNE if plus > 0 else (ACCENT if plus < 0 else DISCRET))
 		var prix: int = Magasin.prix(numero, rayon_avions)
 		if Magasin.possede(numero, rayon_avions):
 			var a_nous := _bouton("Dans ton garage", CARTE, JAUNE, 16)

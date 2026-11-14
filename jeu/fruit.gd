@@ -34,7 +34,8 @@ static func _kart(kart: Node3D, couleur: Color, forme: String) -> void:
 	var bois := _bois()
 
 	# Ce que tous les véhicules ont : le plancher (étroit sur une moto), le siège et le volant.
-	_ajouter(kart, _boite(Vector3(0.45 if forme == "moto" else 1.15, 0.12, 2.6)), sombre, Vector3(0, 0.3, 0))
+	var deux_roues := forme in ["moto", "scooter", "moto-cross", "moto-course"]
+	_ajouter(kart, _boite(Vector3(0.45 if deux_roues else 1.15, 0.12, 2.6)), sombre, Vector3(0, 0.3, 0))
 	_ajouter(kart, _boite(Vector3(0.85, 0.8, 0.14)), cuir, Vector3(0, 0.78, 0.82)).rotation_degrees.x = -12
 	_membre(kart, Vector3(0, 0.55, -0.6), Vector3(0, 0.95, -0.25), 0.04, metal)
 	var cercle := TorusMesh.new()
@@ -80,6 +81,48 @@ static func _kart(kart: Node3D, couleur: Color, forme: String) -> void:
 				_ajouter(kart, _boite(Vector3(0.5, 0.08, 1.5)), peinture, Vector3(x, 1.4, 0.7))  # les garde-boue
 			_ajouter(kart, _boite(Vector3(1.0, 0.5, 0.5)), peinture, Vector3(0, 0.6, 1.2))
 			_ajouter(kart, _boule(0.14), _matiere(Color("#ffb300")), Vector3(0, 1.3, 1.0))  # le gyrophare
+		"scooter":
+			# Deux petites roues, un grand tablier devant, un plancher plat et un coffre derrière.
+			roues = [0.32, 0.32, 0.26, 0.0, -1.3, 1.2]
+			_ajouter(kart, _boite(Vector3(0.8, 0.1, 1.3)), peinture, Vector3(0, 0.38, -0.3))  # le plancher
+			_ajouter(kart, _boite(Vector3(0.85, 0.95, 0.12)), rayee, Vector3(0, 0.8, -1.0)).rotation_degrees.x = 14  # le tablier
+			_ajouter(kart, _boite(Vector3(0.5, 0.1, 0.7)), peinture, Vector3(0, 0.7, -1.3))  # le garde-boue avant
+			_membre(kart, Vector3(0, 0.4, -1.25), Vector3(0, 1.4, -0.95), 0.06, metal)  # la colonne du guidon
+			_membre(kart, Vector3(-0.5, 1.4, -0.95), Vector3(0.5, 1.4, -0.95), 0.045, sombre)  # le guidon
+			_ajouter(kart, _boule(0.16), _matiere(Color("#fff59d")), Vector3(0, 1.15, -1.12))  # le phare
+			for x: float in [-0.5, 0.5]:
+				_ajouter(kart, _boule(0.09), metal, Vector3(x, 1.55, -0.95))  # les rétroviseurs
+			var capot := _ajouter(kart, _capsule(0.38, 1.1), peinture, Vector3(0, 0.6, 0.95))  # la coque arrière
+			capot.rotation_degrees.x = 90
+			_ajouter(kart, _boite(Vector3(0.6, 0.45, 0.5)), sombre, Vector3(0, 1.2, 1.5))  # le coffre
+		"moto-cross":
+			# De grandes roues fines, un garde-boue très haut, une plaque à numéro et un pot relevé.
+			roues = [0.6, 0.55, 0.22, 0.0, -1.45, 1.3]
+			var bidon := _ajouter(kart, _capsule(0.3, 1.0), rayee, Vector3(0, 0.85, -0.5))
+			bidon.rotation_degrees.x = 90
+			_ajouter(kart, _boite(Vector3(0.45, 0.5, 0.7)), metal, Vector3(0, 0.55, 0.3))  # le moteur
+			for x: float in [-0.2, 0.2]:
+				_membre(kart, Vector3(x, 0.6, -1.45), Vector3(x, 1.5, -0.8), 0.05, metal)  # la longue fourche
+			_membre(kart, Vector3(-0.6, 1.5, -0.78), Vector3(0.6, 1.5, -0.78), 0.045, sombre)  # le guidon large
+			_ajouter(kart, _boite(Vector3(0.36, 0.06, 1.0)), peinture, Vector3(0, 1.32, -1.45)).rotation_degrees.x = -12  # le garde-boue haut
+			_ajouter(kart, _boite(Vector3(0.5, 0.42, 0.05)), _matiere(Color("#fdf6e3")), Vector3(0, 1.32, -0.98))  # la plaque à numéro
+			_ajouter(kart, _boite(Vector3(0.36, 0.06, 1.1)), peinture, Vector3(0, 1.25, 1.35)).rotation_degrees.x = 14  # le garde-boue arrière
+			_membre(kart, Vector3(0.28, 0.6, 0.4), Vector3(0.34, 1.15, 1.6), 0.08, metal)  # le pot relevé
+		"moto-course":
+			# Couchée et carénée : une bulle devant, de gros pneus, un dosseret et deux pots.
+			roues = [0.46, 0.5, 0.42, 0.0, -1.35, 1.25]
+			var carenage := _ajouter(kart, _capsule(0.5, 1.9), rayee, Vector3(0, 0.62, -0.6))
+			carenage.rotation_degrees.x = 90
+			carenage.scale = Vector3(0.8, 1, 1)
+			var bulle := _ajouter(kart, _boule(0.34), _matiere(Color("#9fd8ff")), Vector3(0, 1.02, -1.0))  # la bulle
+			bulle.scale = Vector3(1, 0.8, 1.3)
+			_ajouter(kart, _boite(Vector3(0.5, 0.4, 0.8)), metal, Vector3(0, 0.45, 0.4))  # le moteur
+			_membre(kart, Vector3(-0.42, 0.95, -0.85), Vector3(0.42, 0.95, -0.85), 0.045, sombre)  # les demi-guidons, très bas
+			var dosseret := _ajouter(kart, _capsule(0.3, 1.0), peinture, Vector3(0, 0.95, 1.3))
+			dosseret.rotation_degrees.x = 70
+			_ajouter(kart, _boite(Vector3(0.9, 0.05, 0.3)), peinture, Vector3(0, 1.3, 1.65))  # le petit aileron
+			for x: float in [-0.26, 0.26]:
+				_membre(kart, Vector3(x, 0.42, 0.5), Vector3(x * 1.2, 0.7, 1.75), 0.08, metal)  # les deux pots
 		"moto":
 			# Deux grosses roues l'une derrière l'autre, un réservoir, une fourche, un guidon et un pot.
 			roues = [0.5, 0.5, 0.3, 0.0, -1.35, 1.25]
@@ -210,6 +253,27 @@ static func _avion(avion: Node3D, couleur: Color, forme: String) -> void:
 			for cote: float in [-1.0, 1.0]:
 				_ajouter(avion, _boite(Vector3(2.6, 0.1, 1.1)), peinture, Vector3(cote * 1.7, 0.75, 0.0)).rotation.z = cote * 0.35
 				_ajouter(avion, _boite(Vector3(0.1, 0.7, 1.1)), sombre, Vector3(cote * 2.9, 1.45, 0.0))
+		"scooter":
+			# Le scooter volant : deux ailes toutes rondes, comme des pétales.
+			for cote: float in [-1.0, 1.0]:
+				var petale := _ajouter(avion, _boule(1.0), peinture, Vector3(cote * 1.9, 0.6, 0.0))
+				petale.scale = Vector3(1.5, 0.08, 0.9)
+				_ajouter(avion, _boule(0.2), _matiere(Color("#fff59d")), Vector3(cote * 3.3, 0.6, 0.0))
+		"moto-cross":
+			# La moto des nuages : deux paires d'ailes courtes, une en bas et une en haut.
+			for cote: float in [-1.0, 1.0]:
+				for y: float in [0.4, 2.0]:
+					_ajouter(avion, _boite(Vector3(2.4, 0.1, 1.0)), peinture, Vector3(cote * 1.7, y, -0.1))
+				_membre(avion, Vector3(cote * 2.5, 0.4, -0.1), Vector3(cote * 2.5, 2.0, -0.1), 0.05, metal)
+				_membre(avion, Vector3(cote * 0.6, 0.6, -0.1), Vector3(cote * 0.9, 2.0, -0.1), 0.05, metal)
+		"moto-course":
+			# La moto fusée : des ailes en flèche et une tuyère qui brille, pas d'hélice.
+			helice = false
+			for cote: float in [-1.0, 1.0]:
+				_ajouter(avion, _boite(Vector3(3.0, 0.1, 1.3)), peinture, Vector3(cote * 1.8, 0.45, 0.5)).rotation.y = cote * 0.6
+				_ajouter(avion, _boite(Vector3(0.1, 0.6, 0.9)), sombre, Vector3(cote * 3.0, 0.7, 1.35))
+			_ajouter(avion, _roue(0.34, 0.5), metal, Vector3(0, 0.8, 3.2)).rotation_degrees.x = 90
+			_ajouter(avion, _boule(0.26), _matiere(Color("#ffb300")), Vector3(0, 0.8, 3.45))
 		"cagette":
 			# Le planeur en bois : de très longues ailes fines, pas d'hélice.
 			helice = false
