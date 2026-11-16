@@ -67,6 +67,17 @@ Le menu propose cinq façons de jouer :
 La chasse aux graines et la patate chaude se jouent en kart seulement. Les noms et les règles sont dans
 `donnees/modes.gd`, les durées dans `donnees/reglages.gd`.
 
+### Les coupes
+
+L'épreuve **Coupe** enchaîne trois courses contre les mêmes pilotes. À chaque course, on gagne des
+points selon sa place (10, 7, 5, 3, 2, 1), et à la fin on additionne tout. Monter sur le podium donne
+un trophée (or, argent ou bronze), des graines, et un cadeau la première fois : un nouveau pilote,
+un nouveau véhicule, ou l'ouverture d'une coupe secrète. Les trophées se gagnent en kart et en avion,
+et se jouent seul ou à deux.
+
+Les coupes, leurs circuits et leurs cadeaux sont dans `donnees/coupes.gd`. Un pilote ou un véhicule
+qui est un cadeau porte le nom de sa coupe (clé `coupe`) : on ne peut pas le choisir avant de l'avoir gagné.
+
 ### Le mode Skate
 
 Dans le menu, le mode **Skate** emmène un ou deux joueurs dans le skatepark des fruits. On n'y fait

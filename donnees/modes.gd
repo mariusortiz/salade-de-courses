@@ -14,6 +14,7 @@ extends RefCounted
 
 const EPREUVES := [
 	{"cle": "course", "nom": "Course", "texte": "Le premier arrivé gagne.", "avions": true, "seul": false},
+	{"cle": "coupe", "nom": "Coupe", "texte": "Trois courses à la suite, on additionne les points. Le podium gagne un trophée !", "avions": true, "seul": false},
 	{"cle": "elimination", "nom": "Élimination", "texte": "À la fin de chaque tour, le dernier est éliminé. Le dernier en piste gagne.", "avions": true, "seul": false},
 	{"cle": "chrono", "nom": "Contre-la-montre", "texte": "Seul sur la piste : bats ton record, et le fantôme de ta meilleure course.", "avions": true, "seul": true},
 	{"cle": "chasse", "nom": "Chasse aux graines", "texte": "Ramasse le plus de graines avant la fin du temps. Un pépin reçu en fait perdre deux.", "avions": false, "seul": false},

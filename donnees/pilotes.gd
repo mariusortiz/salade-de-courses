@@ -19,6 +19,9 @@
 #  Il n'y a que NOMBRE_DE_KARTS karts par course (voir reglages.gd) : les joueurs, plus des
 #  pilotes tirés au hasard.
 #
+#    coupe         le nom d'une coupe (voir donnees/coupes.gd) : ce pilote est le cadeau de
+#                  cette coupe, on ne peut le choisir qu'après l'avoir gagnée
+#
 #  Astuce : un bon pilote n'a pas 5 partout. Ici le total fait 9 pour tout le monde.
 # ─────────────────────────────────────────────────────────────
 extends RefCounted
@@ -36,4 +39,5 @@ const PILOTES := [
 	{"nom": "Coco", "forme": "ronde", "motif": "uni", "taille": 1.2, "couleur": "#6d4c41", "kart": "#26a69a", "vitesse": 4, "acceleration": 1, "maniabilite": 4, "modele": "", "modele_taille": 1.0, "modele_rotation": 0},
 	{"nom": "Mimi", "forme": "ronde", "motif": "uni", "taille": 0.75, "couleur": "#3f51b5", "kart": "#ffca28", "vitesse": 1, "acceleration": 4, "maniabilite": 4, "modele": "", "modele_taille": 1.0, "modele_rotation": 0},
 	{"nom": "Kiko", "forme": "ronde", "motif": "points", "taille": 0.9, "couleur": "#8d6e3f", "kart": "#7cb342", "vitesse": 3, "acceleration": 2, "maniabilite": 4, "modele": "", "modele_taille": 1.0, "modele_rotation": 0},
+	{"nom": "Mûre", "forme": "grappe", "motif": "uni", "taille": 0.85, "couleur": "#311b92", "kart": "#ec407a", "vitesse": 4, "acceleration": 3, "maniabilite": 2, "modele": "", "modele_taille": 1.0, "modele_rotation": 0, "coupe": "Coupe Cerise"},  # provisoire
 ]

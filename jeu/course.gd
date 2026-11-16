@@ -43,6 +43,7 @@ var trace: Array = []    # Contre-la-montre : la course du joueur, notée dix fo
 var fantome: Array = []  # Contre-la-montre : la trace de sa meilleure course
 var fantome_visible: Node3D
 var record := -1.0
+var ordis: Array = []   # Coupe : les adversaires imposés, [numéro du pilote, numéro du véhicule]
 
 
 # humains : les numéros des pilotes des joueurs. vehicules : le numéro du véhicule de chacun.
@@ -68,6 +69,8 @@ func demarrer(circuit: Dictionary, humains: Array, vehicules: Array = [], tours 
 		autres = []  # contre la montre, on est seul sur la piste
 	for i in autres.slice(0, maxi(0, R.NOMBRE_DE_KARTS - humains.size())):
 		grille.append([i, false, Vehicules.VEHICULES.pick_random()])
+	if not ordis.is_empty():
+		grille = ordis.map(func(o): return [o[0], false, Vehicules.VEHICULES[o[1]]])
 	for j in humains.size():
 		grille.append([humains[j], true, Vehicules.VEHICULES[vehicules[j] if j < vehicules.size() else 0]])
 	for n in grille.size():

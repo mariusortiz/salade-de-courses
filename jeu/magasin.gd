@@ -5,6 +5,7 @@ extends RefCounted
 
 const Defi = preload("res://jeu/defi.gd")
 const Vehicules = preload("res://donnees/vehicules.gd")
+const Coupe = preload("res://jeu/coupe.gd")
 
 
 static func graines() -> int:
@@ -26,8 +27,11 @@ static func _etiquette(numero: int, avion: bool) -> String:
 	return ("avion:" if avion else "voiture:") + str(Vehicules.VEHICULES[numero]["forme"])
 
 
-# Ce véhicule est-il à nous ? Ceux qui ne coûtent rien le sont toujours.
+# Ce véhicule est-il à nous ? Ceux qui ne coûtent rien le sont toujours,
+# sauf les cadeaux des coupes : il faut d'abord gagner la coupe.
 static func possede(numero: int, avion: bool) -> bool:
+	if Vehicules.VEHICULES[numero].has("coupe"):
+		return Coupe.debloque(Vehicules.VEHICULES[numero])
 	if prix(numero, avion) <= 0:
 		return true
 	var garage = Defi._lire().get("garage", [])

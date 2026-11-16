@@ -12,6 +12,9 @@
 #    vitesse, acceleration, maniabilite
 #                  ce que le véhicule ajoute (1) ou enlève (-1) aux points du pilote
 #
+#    coupe         le nom d'une coupe (voir donnees/coupes.gd) : ce véhicule ne s'achète pas,
+#                  c'est le cadeau de cette coupe (en voiture et en avion)
+#
 #  Astuce : un bon véhicule donne autant qu'il enlève. Ici le total fait 0 pour tout le monde.
 # ─────────────────────────────────────────────────────────────
 extends RefCounted
@@ -26,4 +29,5 @@ const VEHICULES := [
 	{"nom": "Scooter", "avion": "Scooter volant", "forme": "scooter", "vitesse": -2, "acceleration": 1, "maniabilite": 1, "prix": 150, "prix_avion": 150},
 	{"nom": "Moto tout-terrain", "avion": "Moto des nuages", "forme": "moto-cross", "vitesse": 0, "acceleration": 1, "maniabilite": -1, "prix": 300, "prix_avion": 300},
 	{"nom": "Moto de course", "avion": "Moto fusée", "forme": "moto-course", "vitesse": 2, "acceleration": -1, "maniabilite": -1, "prix": 450, "prix_avion": 450},
+	{"nom": "Bolide doré", "avion": "Jet doré", "forme": "bolide", "vitesse": 1, "acceleration": 1, "maniabilite": -2, "prix": 0, "prix_avion": 0, "coupe": "Coupe Citron"},  # provisoire
 ]

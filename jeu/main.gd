@@ -14,6 +14,8 @@ const Defi = preload("res://jeu/defi.gd")
 const Magasin = preload("res://jeu/magasin.gd")
 const Skate = preload("res://jeu/skate.gd")
 const S = preload("res://donnees/skate.gd")
+const Coupes = preload("res://donnees/coupes.gd")
+const Coupe = preload("res://jeu/coupe.gd")
 
 # Les couleurs du menu.
 const FOND := Color("#101629")
@@ -26,11 +28,12 @@ const DISCRET := Color("#9aa6c7")
 
 var GRAS := FontVariation.new()  # la police des titres, en plus épais
 
-var choix := {"joueurs": 1, "pilotes": [0, 1], "vehicules": [0, 0], "circuit": 0, "tours": 3, "avions": false, "onglet": 0, "epreuve": 0, "skate": false, "planches": [0, 0]}
+var choix := {"joueurs": 1, "pilotes": [0, 1], "vehicules": [0, 0], "circuit": 0, "tours": 3, "avions": false, "onglet": 0, "epreuve": 0, "skate": false, "planches": [0, 0], "coupe": 0}
 var menu: Control
 var resultats: Control
 var course: Node
 var defi := {}             # le défi du jour, quand on est en train de le jouer
+var grand_prix := {}       # la coupe en cours : son numéro, la course, les adversaires, les points
 var tournants: Array = []  # les plateaux du menu, qui tournent pour montrer les pilotes
 var angle := 0.0
 var au_magasin := false     # true = on regarde le magasin au lieu du menu
@@ -46,6 +49,7 @@ var essai_trace := 0.0
 var essai_raccourci := ""
 var essai_secret := false
 var essai_skate := ""
+var essai_coupe := ""   # "-" = sans capture, sinon le fichier de la capture du classement final
 var musique := AudioStreamPlayer.new()
 
 
@@ -95,6 +99,13 @@ func _ready() -> void:
 		elif option.begins_with("--essai-skate="):
 			choix["skate"] = true
 			essai_skate = option.trim_prefix("--essai-skate=")
+		elif option.begins_with("--essai-coupe"):
+			# L'ordinateur joue une coupe entière à la place du joueur.
+			essai_coupe = option.trim_prefix("--essai-coupe").trim_prefix("=")
+			essai_coupe = "-" if essai_coupe == "" else essai_coupe
+			choix["epreuve"] = Modes.EPREUVES.map(func(e): return e["cle"]).find("coupe")
+		elif option.begins_with("--coupe="):
+			choix["coupe"] = int(option.trim_prefix("--coupe="))
 		elif option == "--secret":
 			essai_secret = true
 		elif option.begins_with("--essai-raccourci="):
@@ -114,6 +125,8 @@ func _ready() -> void:
 		_simuler()
 	elif capture != "":
 		_lancer(true)
+	elif essai_coupe != "":
+		_lancer(false)
 	elif essai_skate != "":
 		# L'ordinateur fait une démonstration, et on écrit toutes ses figures.
 		_lancer(true)
@@ -151,6 +164,7 @@ func _montrer_menu() -> void:
 	_nettoyer()
 	_jouer(R.MUSIQUE_MENU)
 	defi = {}
+	grand_prix = {}
 	tournants.clear()
 	menu = ColorRect.new()
 	menu.color = FOND
@@ -200,7 +214,9 @@ func _montrer_menu() -> void:
 	if choix["skate"]:
 		_menu_du_skate(page)
 		return
-	_reglette(entete, "Tours", R.CHOIX_DE_TOURS.map(func(t): return str(t)), R.CHOIX_DE_TOURS.find(choix["tours"]), func(i): choix["tours"] = R.CHOIX_DE_TOURS[i])
+	var en_coupe: bool = epreuve["cle"] == "coupe"
+	if not en_coupe:
+		_reglette(entete, "Tours", R.CHOIX_DE_TOURS.map(func(t): return str(t)), R.CHOIX_DE_TOURS.find(choix["tours"]), func(i): choix["tours"] = R.CHOIX_DE_TOURS[i])
 
 	# Juste dessous : l'épreuve, et sa règle.
 	var ligne := HBoxContainer.new()
@@ -223,8 +239,11 @@ func _montrer_menu() -> void:
 	droite.add_theme_constant_override("separation", 14)
 	droite.custom_minimum_size.x = 400 if choix["joueurs"] == 1 else 340
 	corps.add_child(droite)
-	_carte_du_circuit(droite)
-	_carte_des_defis(droite)
+	if en_coupe:
+		_carte_de_la_coupe(droite)  # les défis n'ont rien à voir avec les coupes : on ne les montre pas
+	else:
+		_carte_du_circuit(droite)
+		_carte_des_defis(droite)
 
 	# En bas : le rappel des touches et le bouton pour partir.
 	var pied := HBoxContainer.new()
@@ -234,7 +253,14 @@ func _montrer_menu() -> void:
 	aide.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	aide.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	aide.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	var demarrer := _bouton("Démarrer la course", ACCENT, Color.WHITE, 26)
+	if en_coupe and not Coupe.ouverte(Coupes.COUPES[choix["coupe"]]):
+		var fermee := _bouton("Coupe fermée", CARTE_CLAIRE, DISCRET, 26)
+		fermee.disabled = true
+		fermee.add_theme_color_override("font_disabled_color", DISCRET)
+		fermee.add_theme_stylebox_override("disabled", fermee.get_theme_stylebox("normal"))
+		pied.add_child(fermee)
+		return
+	var demarrer := _bouton("Démarrer la coupe" if en_coupe else "Démarrer la course", ACCENT, Color.WHITE, 26)
 	demarrer.pressed.connect(func(): _lancer(false))
 	pied.add_child(demarrer)
 	demarrer.grab_focus()
@@ -314,10 +340,9 @@ func _carte_du_joueur(parent: Control, j: int) -> void:
 
 	_apercu(carte, pilote, vehicule, choix["avions"] and not choix["skate"])
 
-	var nombre := Pilotes.PILOTES.size()
 	_selecteur(carte, pilote["nom"], Color(pilote["couleur"]).lightened(0.35), 26,
-		func(): choix["pilotes"][j] = (choix["pilotes"][j] + nombre - 1) % nombre,
-		func(): choix["pilotes"][j] = (choix["pilotes"][j] + 1) % nombre)
+		func(): choix["pilotes"][j] = _pilote_voisin(choix["pilotes"][j], -1),
+		func(): choix["pilotes"][j] = _pilote_voisin(choix["pilotes"][j], 1))
 	if choix["skate"]:
 		# En skate, on choisit seulement sa planche : elles roulent toutes pareil.
 		var planches: int = S.PLANCHES.size()
@@ -342,6 +367,16 @@ func _carte_du_joueur(parent: Control, j: int) -> void:
 	for qualite in [["Vitesse", "vitesse"], ["Accélération", "acceleration"], ["Maniabilité", "maniabilite"]]:
 		_texte(points, qualite[0], 15, DISCRET)
 		_pastilles(points, pilote[qualite[1]] + vehicule[qualite[1]], 6, JAUNE)
+
+
+# Le pilote suivant (sens = 1) ou précédent (sens = -1), en sautant ceux qu'il faut gagner en coupe.
+func _pilote_voisin(numero: int, sens: int) -> int:
+	var nombre := Pilotes.PILOTES.size()
+	for pas in range(1, nombre + 1):
+		var voisin := (numero + sens * pas + nombre * pas) % nombre
+		if Coupe.debloque(Pilotes.PILOTES[voisin]):
+			return voisin
+	return numero
 
 
 # Montre un pilote dans son véhicule, en 3D, sur un plateau qui tourne.
@@ -433,6 +468,11 @@ func _montrer_le_magasin(page: Control) -> void:
 			var plus: int = vehicule[qualite[1]]
 			_texte(qualites, "%s %s" % [qualite[0], ("+%d" % plus) if plus > 0 else ("%d" % plus if plus < 0 else "=")], 13, JAUNE if plus > 0 else (ACCENT if plus < 0 else DISCRET))
 		var prix: int = Magasin.prix(numero, rayon_avions)
+		if vehicule.has("coupe") and not Magasin.possede(numero, rayon_avions):
+			# Un cadeau de coupe ne s'achète pas.
+			var cadeau := _texte(carte, "À gagner :\n" + vehicule["coupe"], 15, JAUNE, true)
+			cadeau.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			continue
 		if Magasin.possede(numero, rayon_avions):
 			var a_nous := _bouton("Dans ton garage", CARTE, JAUNE, 16)
 			a_nous.disabled = true
@@ -472,6 +512,64 @@ func _carte_du_circuit(parent: Control) -> void:
 		func(): choix["circuit"] = (choix["circuit"] + 1) % nombre)
 	var info := _texte(carte, "%d m par tour  ·  décor : %s  ·  %d / %d" % [longueur, circuit.get("decor", "campagne"), choix["circuit"] + 1, nombre], 14, DISCRET)
 	info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+
+# La carte de la coupe : ses circuits, le trophée déjà gagné dans ce mode, et le cadeau.
+func _carte_de_la_coupe(parent: Control) -> void:
+	var carte := _carte(parent, "Coupe")
+	carte.get_parent().size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var nombre := Coupes.COUPES.size()
+	var coupe: Dictionary = Coupes.COUPES[choix["coupe"]]
+	var ouverte := Coupe.ouverte(coupe)
+	_selecteur(carte, coupe["nom"] if ouverte else "? ? ?", Color(coupe["couleur"]).lightened(0.3) if ouverte else DISCRET, 22,
+		func(): choix["coupe"] = (choix["coupe"] + nombre - 1) % nombre,
+		func(): choix["coupe"] = (choix["coupe"] + 1) % nombre)
+	if not ouverte:
+		var qui := ""
+		for autre in Coupes.COUPES:
+			if autre.get("cadeau", {}).get("coupe", "") == coupe["nom"]:
+				qui = autre["nom"]
+		var cachee := _texte(carte, "Une coupe secrète !\nMonte sur le podium de la %s pour l'ouvrir." % qui, 16, TEXTE)
+		cachee.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		cachee.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		cachee.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		cachee.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		return
+
+	# Les circuits, côte à côte, dans l'ordre des courses.
+	var circuits := HBoxContainer.new()
+	circuits.add_theme_constant_override("separation", 8)
+	carte.add_child(circuits)
+	var largeur := 110 if choix["joueurs"] == 1 else 96
+	for k in coupe["circuits"].size():
+		var circuit: Dictionary = Circuits.CIRCUITS[coupe["circuits"][k]]
+		var colonne := VBoxContainer.new()
+		colonne.add_theme_constant_override("separation", 4)
+		colonne.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		circuits.add_child(colonne)
+		_plan(colonne, circuit, Vector2(largeur, 90 if choix["joueurs"] == 1 else 70))
+		var nom := _texte(colonne, "%d. %s" % [k + 1, circuit["nom"]], 13, TEXTE)
+		nom.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		nom.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		nom.custom_minimum_size.x = largeur
+	var vide := Control.new()
+	vide.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	carte.add_child(vide)
+
+	# Le trophée de ce mode, et le cadeau.
+	var ligne := HBoxContainer.new()
+	ligne.add_theme_constant_override("separation", 10)
+	carte.add_child(ligne)
+	var place := Coupe.trophee(coupe["nom"], choix["avions"])
+	_pastilles(ligne, 1 if place > 0 else 0, 1, Color(Coupes.COULEUR_TROPHEES[place - 1]) if place > 0 else CARTE_CLAIRE, 18)
+	var mode := "en avion" if choix["avions"] else "en kart"
+	_texte(ligne, ("Trophée %s %s" % [Coupes.TROPHEES[place - 1].to_lower(), mode]) if place > 0 else "Pas encore de trophée " + mode, 16, JAUNE if place > 0 else DISCRET, true)
+	var cadeau := Coupe.cadeau_en_mots(coupe)
+	if cadeau != "":
+		var texte := ("Cadeau gagné : " + cadeau) if Coupe.gagnee(coupe["nom"]) else ("Sur le podium, tu gagnes " + cadeau + " !")
+		_texte(carte, texte, 15, TEXTE).autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	var points := _texte(carte, "%d tours par course. Points à chaque course : %s." % [Coupes.TOURS, ", ".join(Coupes.POINTS.map(func(p): return str(p)))], 13, DISCRET)
+	points.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 
 
 # Dessine le plan d'un circuit et répond la longueur d'un tour, en mètres.
@@ -726,7 +824,7 @@ func _lancer(demo: bool) -> void:
 	var joueurs: int = 1 if not defi.is_empty() else choix["joueurs"]
 	var humains: Array = choix["pilotes"].slice(0, joueurs)
 	if joueurs == 2 and humains[0] == humains[1]:
-		humains[1] = (humains[0] + 1) % Pilotes.PILOTES.size()  # pas deux fois le même fruit
+		humains[1] = _pilote_voisin(humains[0], 1)  # pas deux fois le même fruit
 	if choix["skate"] and defi.is_empty():
 		# Le mode Skate : pas de circuit ni de véhicule, juste le skatepark.
 		course = Skate.new()
@@ -738,7 +836,7 @@ func _lancer(demo: bool) -> void:
 		_jouer(S.MUSIQUE)
 		return
 	course = Course.new()
-	course.demo = demo
+	course.demo = demo or essai_coupe != ""
 	add_child(course)
 	course.finie.connect(_montrer_resultats)
 	var circuit: Dictionary = Circuits.CIRCUITS[defi["circuit"] if not defi.is_empty() else choix["circuit"]]
@@ -747,6 +845,19 @@ func _lancer(demo: bool) -> void:
 	var vehicules: Array = choix["vehicules"].map(func(v): return v if Magasin.possede(v, en_avion) else 0)
 	if defi.is_empty():
 		var sorte: String = Modes.EPREUVES[choix["epreuve"]]["cle"]
+		if sorte == "coupe":
+			# La coupe : les mêmes adversaires, avec les mêmes véhicules, à chaque course.
+			if grand_prix.is_empty():
+				var autres: Array = range(Pilotes.PILOTES.size()).filter(func(i): return not humains.has(i))
+				autres.shuffle()
+				grand_prix = {"coupe": choix["coupe"], "manche": 0, "points": {}, "dernier": [], "humains": humains,
+					"ordis": autres.slice(0, maxi(0, R.NOMBRE_DE_KARTS - humains.size())).map(func(i): return [i, randi() % Vehicules.VEHICULES.size()])}
+			var coupe: Dictionary = Coupes.COUPES[grand_prix["coupe"]]
+			circuit = Circuits.CIRCUITS[coupe["circuits"][grand_prix["manche"]]]
+			course.ordis = grand_prix["ordis"]
+			course.demarrer(circuit, humains, vehicules, Coupes.TOURS, en_avion, "", "course")
+			_jouer(circuit.get("musique", ""))
+			return
 		if sorte == "chrono":
 			# Contre-la-montre : on retrouve le record de ce circuit et son fantôme.
 			var ancien: Dictionary = Defi.record(_cle_du_record())
@@ -777,6 +888,9 @@ func _montrer_resultats(classement: Array) -> void:
 		titre = "Défi : " + defi["epreuve"]["nom"]
 	elif not defi.is_empty():
 		titre = "Défi du jour"
+	elif not grand_prix.is_empty():
+		var coupe: Dictionary = Coupes.COUPES[grand_prix["coupe"]]
+		titre = "%s  ·  course %d / %d" % [coupe["nom"], grand_prix["manche"] + 1, coupe["circuits"].size()]
 	var carte := _carte(centre, titre)
 	carte.custom_minimum_size.x = 440
 	_texte(carte, "Classement", 34, TEXTE, true)
@@ -799,6 +913,13 @@ func _montrer_resultats(classement: Array) -> void:
 		if detail == "" or detail == "gagnant":
 			detail = "%.1f s" % r["temps"] if r["temps"] >= 0.0 else "—"
 		_texte(ligne, detail, 20, couleur)
+		if not grand_prix.is_empty():
+			# La coupe : les points de cette course s'ajoutent à ceux d'avant.
+			var points: int = Coupes.POINTS[mini(i, Coupes.POINTS.size() - 1)]
+			grand_prix["points"][r["nom"]] = int(grand_prix["points"].get(r["nom"], 0)) + points
+			_texte(ligne, "+%d" % points, 20, JAUNE, true).custom_minimum_size.x = 44
+	if not grand_prix.is_empty():
+		grand_prix["dernier"] = classement.map(func(r): return r["nom"])
 
 	# Les graines : selon la place, et plus pour une course plus longue.
 	var graines := 0
@@ -827,7 +948,7 @@ func _montrer_resultats(classement: Array) -> void:
 		# Chasse aux graines : on garde ce qu'on a ramassé, plus la prime du classement.
 		graines = int(joueur.get("score", 0)) + R.GRAINES_PAR_PLACE[mini(place, R.GRAINES_PAR_PLACE.size()) - 1]
 	elif place > 0 and not en_demo and (joueur["temps"] >= 0.0 or sorte != "course"):
-		var tours: int = defi["tours"] if not defi.is_empty() else choix["tours"]
+		var tours: int = defi["tours"] if not defi.is_empty() else (Coupes.TOURS if not grand_prix.is_empty() else choix["tours"])
 		if sorte != "course":
 			tours = 3
 		graines = int(R.GRAINES_PAR_PLACE[mini(place, R.GRAINES_PAR_PLACE.size()) - 1] * tours / 3.0)
@@ -867,11 +988,117 @@ func _montrer_resultats(classement: Array) -> void:
 	carte.add_child(boutons)
 	var rejouer := _bouton("Rejouer", ACCENT, Color.WHITE, 22)
 	rejouer.pressed.connect(func(): _lancer(false))
+	if not grand_prix.is_empty():
+		# En coupe : on enchaîne la course suivante, ou on découvre le classement final.
+		var derniere: bool = grand_prix["manche"] + 1 >= Coupes.COUPES[grand_prix["coupe"]]["circuits"].size()
+		rejouer = _bouton("Classement de la coupe" if derniere else "Course suivante", ACCENT, Color.WHITE, 22)
+		rejouer.pressed.connect(func():
+			if derniere:
+				_fin_de_la_coupe()
+			else:
+				grand_prix["manche"] += 1
+				_lancer(false))
 	boutons.add_child(rejouer)
-	var retour := _bouton("Menu", CARTE_CLAIRE, TEXTE, 22)
+	var retour := _bouton("Abandonner" if not grand_prix.is_empty() else "Menu", CARTE_CLAIRE, TEXTE, 22)
 	retour.pressed.connect(_montrer_menu)
 	boutons.add_child(retour)
 	rejouer.grab_focus()
+	if essai_coupe != "":
+		print("%s : %s" % [titre, ", ".join(classement.map(func(r): return "%s %s" % [r["nom"], ("%.1f s" % r["temps"]) if r["temps"] >= 0.0 else "—"]))])
+		await get_tree().create_timer(0.5).timeout
+		rejouer.pressed.emit()
+
+
+# Le classement final de la coupe : on additionne les points, et le podium gagne un trophée.
+func _fin_de_la_coupe() -> void:
+	_nettoyer()
+	_jouer(R.MUSIQUE_ARRIVEE)
+	var coupe: Dictionary = Coupes.COUPES[grand_prix["coupe"]]
+	var points: Dictionary = grand_prix["points"]
+	var dernier: Array = grand_prix["dernier"]
+	var noms: Array = points.keys()
+	# À égalité de points, c'est la dernière course qui départage.
+	noms.sort_custom(func(a, b):
+		if points[a] != points[b]:
+			return points[a] > points[b]
+		return dernier.find(a) < dernier.find(b))
+	var nos_noms: Array = grand_prix["humains"].map(func(i): return Pilotes.PILOTES[i]["nom"])
+
+	resultats = ColorRect.new()
+	resultats.color = FOND
+	resultats.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(resultats)
+	var centre := CenterContainer.new()
+	centre.set_anchors_preset(Control.PRESET_FULL_RECT)
+	resultats.add_child(centre)
+	var carte := _carte(centre, coupe["nom"] + ("  ·  avions" if choix["avions"] else "  ·  karts"))
+	carte.custom_minimum_size.x = 460
+	_texte(carte, "Classement final", 34, TEXTE, true)
+	var place := 0
+	for i in noms.size():
+		var nom: String = noms[i]
+		var a_nous := nos_noms.has(nom)
+		if a_nous and place == 0:
+			place = i + 1
+		var ligne := HBoxContainer.new()
+		ligne.add_theme_constant_override("separation", 14)
+		carte.add_child(ligne)
+		if i < 3:
+			_pastilles(ligne, 1, 1, Color(Coupes.COULEUR_TROPHEES[i]), 18)
+		else:
+			_texte(ligne, "%d" % (i + 1), 20, DISCRET, true).custom_minimum_size.x = 18
+		_texte(ligne, nom, 22, JAUNE if a_nous else TEXTE, a_nous).size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_texte(ligne, "%d points" % points[nom], 20, JAUNE if a_nous else TEXTE)
+
+	# Le trophée, les graines et le cadeau.
+	var deja_gagnee := Coupe.gagnee(coupe["nom"])
+	var graines := 0
+	if place >= 1 and place <= 3:
+		_texte(carte, "Trophée %s !" % ["d'or", "d'argent", "de bronze"][place - 1], 30, Color(Coupes.COULEUR_TROPHEES[place - 1]), true).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		if Coupe.noter(coupe["nom"], choix["avions"], place):
+			graines = Coupes.GRAINES[place - 1]  # seulement pour un trophée meilleur qu'avant
+	else:
+		_texte(carte, "%de. Monte sur le podium pour gagner un trophée !" % place, 18, DISCRET, true).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	if graines > 0:
+		Magasin.gagner(graines)
+		_texte(carte, "+ %d graines  (tu en as %d)" % [graines, Magasin.graines()], 18, JAUNE, true).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var cadeau: Dictionary = coupe.get("cadeau", {})
+	if not deja_gagnee and Coupe.gagnee(coupe["nom"]) and not cadeau.is_empty():
+		_texte(carte, "Cadeau : tu as gagné " + Coupe.cadeau_en_mots(coupe) + " !", 22, JAUNE, true).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		var pilote: Dictionary = Pilotes.PILOTES[grand_prix["humains"][0]]
+		var vehicule: Dictionary = Vehicules.VEHICULES[0]
+		for p in Pilotes.PILOTES:
+			if p["nom"] == cadeau.get("pilote", ""):
+				pilote = p
+		for v in Vehicules.VEHICULES:
+			if v["nom"] == cadeau.get("vehicule", ""):
+				vehicule = v
+		if cadeau.has("pilote") or cadeau.has("vehicule"):
+			_apercu(carte, pilote, vehicule, choix["avions"])
+			carte.get_child(carte.get_child_count() - 1).custom_minimum_size = Vector2(420, 150)
+
+	var boutons := HBoxContainer.new()
+	boutons.add_theme_constant_override("separation", 12)
+	boutons.alignment = BoxContainer.ALIGNMENT_CENTER
+	carte.add_child(boutons)
+	var numero: int = grand_prix["coupe"]
+	var encore := _bouton("Rejouer la coupe", ACCENT, Color.WHITE, 22)
+	encore.pressed.connect(func():
+		grand_prix = {}
+		choix["coupe"] = numero
+		_lancer(false))
+	boutons.add_child(encore)
+	var retour := _bouton("Menu", CARTE_CLAIRE, TEXTE, 22)
+	retour.pressed.connect(_montrer_menu)
+	boutons.add_child(retour)
+	retour.grab_focus()
+	if essai_coupe != "":
+		print("Classement final : %s" % ", ".join(noms.map(func(n): return "%s %d" % [n, points[n]])))
+		print("Place du joueur : %d, trophée noté : %d, coupe gagnée : %s" % [place, Coupe.trophee(coupe["nom"], choix["avions"]), Coupe.gagnee(coupe["nom"])])
+		await get_tree().create_timer(1.5).timeout
+		if essai_coupe != "-":
+			get_viewport().get_texture().get_image().save_png(essai_coupe)
+		get_tree().quit()
 
 
 # ── Les essais automatiques ──────────────────────────────────
@@ -964,7 +1191,8 @@ func _simuler() -> void:
 		return
 	course = Course.new()
 	add_child(course)
-	course.demarrer(Circuits.CIRCUITS[essai_circuit], [], [], 0, choix["avions"], "", Modes.EPREUVES[choix["epreuve"]]["cle"])
+	var sorte: String = Modes.EPREUVES[choix["epreuve"]]["cle"]
+	course.demarrer(Circuits.CIRCUITS[essai_circuit], [], [], 0, choix["avions"], "", "course" if sorte == "coupe" else sorte)
 	print("%s : %.0f m par tour, %d tours" % [Circuits.CIRCUITS[essai_circuit]["nom"], course.piste.longueur, course.piste.tours])
 	course.finie.connect(func(classement: Array):
 		for r in classement:
