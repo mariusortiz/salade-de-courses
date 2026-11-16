@@ -55,13 +55,37 @@ static func debloque(chose: Dictionary) -> bool:
 	return not chose.has("coupe") or gagnee(chose["coupe"])
 
 
-# Le cadeau d'une coupe, en mots : « le pilote Mûre », « la Coupe Mystère »...
+# Le cadeau d'une coupe, en mots : « le pilote Melon et la Coupe Bleue »...
 static func cadeau_en_mots(coupe: Dictionary) -> String:
 	var cadeau: Dictionary = coupe.get("cadeau", {})
+	var mots: Array = []
 	if cadeau.has("pilote"):
-		return "le pilote " + cadeau["pilote"]
+		mots.append("le pilote " + cadeau["pilote"])
 	if cadeau.has("vehicule"):
-		return "le véhicule " + cadeau["vehicule"]
+		mots.append("le véhicule " + cadeau["vehicule"])
+	if cadeau.has("skins"):
+		mots.append("les skins des pilotes")
+	if cadeau.has("sac"):
+		mots.append("le sac de pépins")
+	if cadeau.has("pepins_dores"):
+		mots.append("les pépins dorés")
 	if cadeau.has("coupe"):
-		return "la " + cadeau["coupe"]
-	return ""
+		mots.append("la " + cadeau["coupe"])
+	return " et ".join(mots)
+
+
+# A-t-on gagné ce cadeau (« skins », « sac », « pepins_dores ») dans une des coupes ?
+static func cadeau_gagne(sorte: String) -> bool:
+	for coupe in Coupes.COUPES:
+		if coupe.get("cadeau", {}).has(sorte) and gagnee(coupe["nom"]):
+			return true
+	return false
+
+
+# Le pilote avec sa skin (numéro dans Coupes.SKINS) : ses couleurs sont remplacées.
+static func habiller(pilote: Dictionary, skin: int) -> Dictionary:
+	if skin <= 0 or skin >= Coupes.SKINS.size():
+		return pilote
+	var habit: Dictionary = Coupes.SKINS[skin].duplicate()
+	habit.erase("nom")
+	return pilote.merged(habit, true)

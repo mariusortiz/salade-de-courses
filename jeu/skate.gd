@@ -6,6 +6,7 @@ signal finie(resultats: Array)
 
 const S = preload("res://donnees/skate.gd")
 const Pilotes = preload("res://donnees/pilotes.gd")
+const Coupe = preload("res://jeu/coupe.gd")
 const Skatepark = preload("res://jeu/skatepark.gd")
 const Skateur = preload("res://jeu/skateur.gd")
 const Course = preload("res://jeu/course.gd")  # pour avoir les mêmes touches qu'en course
@@ -22,13 +23,14 @@ var record := 0
 var duree: float = S.DUREE  # la durée de la session (les essais la raccourcissent)
 
 
-func demarrer(humains: Array, planches: Array) -> void:
+func demarrer(humains: Array, planches: Array, tenues: Array = []) -> void:
 	piste = Skatepark.new()
 	add_child(piste)
 	piste.construire()
 	for j in humains.size():
 		var skateur: Node3D = Skateur.new()
-		skateur.preparer(Pilotes.PILOTES[humains[j]], piste, true, S.PLANCHES[planches[j] if j < planches.size() else 0])
+		var pilote: Dictionary = Coupe.habiller(Pilotes.PILOTES[humains[j]], tenues[j] if j < tenues.size() else 0)
+		skateur.preparer(pilote, piste, true, S.PLANCHES[planches[j] if j < planches.size() else 0])
 		add_child(skateur)
 		# Au départ : à gauche du skatepark, face à la pyramide.
 		skateur.placer(-36.0, -3.0 + j * 6.0 if humains.size() > 1 else 0.0, -PI / 2.0)

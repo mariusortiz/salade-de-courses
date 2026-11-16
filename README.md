@@ -71,12 +71,18 @@ La chasse aux graines et la patate chaude se jouent en kart seulement. Les noms 
 
 L'épreuve **Coupe** enchaîne trois courses contre les mêmes pilotes. À chaque course, on gagne des
 points selon sa place (10, 7, 5, 3, 2, 1), et à la fin on additionne tout. Monter sur le podium donne
-un trophée (or, argent ou bronze), des graines, et un cadeau la première fois : un nouveau pilote,
-un nouveau véhicule, ou l'ouverture d'une coupe secrète. Les trophées se gagnent en kart et en avion,
-et se jouent seul ou à deux.
+un trophée (or, argent ou bronze), des graines, et un cadeau la première fois. Les trophées se gagnent
+en kart et en avion, et se jouent seul ou à deux.
 
-Les coupes, leurs circuits et leurs cadeaux sont dans `donnees/coupes.gd`. Un pilote ou un véhicule
-qui est un cadeau porte le nom de sa coupe (clé `coupe`) : on ne peut pas le choisir avant de l'avoir gagné.
+- **Coupe Cerise** : le pilote Melon.
+- **Coupe Citron** : le sac de pépins, pour démarrer chaque course avec 5 pépins.
+- **Coupe Ananas** : les skins (de nouvelles couleurs pour son pilote, à choisir dans le menu),
+  et l'ouverture de la coupe secrète.
+- **Coupe Bleue** (secrète) : les pépins dorés, plus rapides, qui traversent les boucliers.
+
+Les coupes, leurs circuits, leurs cadeaux et les skins sont dans `donnees/coupes.gd`. Un pilote ou un
+véhicule qui est un cadeau porte le nom de sa coupe (clé `coupe`) : on ne peut pas le choisir avant de
+l'avoir gagné.
 
 ### Le mode Skate
 

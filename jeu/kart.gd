@@ -7,6 +7,7 @@ signal verse(kart: Node3D)  # le kart verse une flaque de jus
 
 const R = preload("res://donnees/reglages.gd")
 const Fruit = preload("res://jeu/fruit.gd")
+const Coupes = preload("res://donnees/coupes.gd")
 
 const RAYON := 0.9
 
@@ -45,6 +46,7 @@ var objet := ""           # le bonus gardé en réserve : "turbo", "bouclier", "
 var annonce := ""         # le texte à montrer au joueur quand il ramasse un bonus
 var annonce_temps := 0.0
 var bouclier := 0.0       # secondes de bouclier qui restent
+var dores := false        # true = ses pépins sont dorés (un cadeau des coupes)
 var toupie := 0.0         # secondes de tête-à-queue qui restent
 var englue := 0.0         # secondes de ralentissement dans le jus qui restent
 var repos_saut := 0.0
@@ -215,11 +217,14 @@ func _utiliser_objet() -> void:
 
 
 # Le kart reçoit un pépin : tête-à-queue, sauf si le bouclier le protège.
-func recevoir_pepin() -> void:
+# Un pépin doré fait éclater le bouclier et fait quand même faire un tête-à-queue, plus long.
+func recevoir_pepin(dore := false) -> void:
 	if bouclier > 0.0:
 		bouclier = 0.0  # le bouclier éclate
-	elif toupie <= 0.0:
-		toupie = R.TETE_A_QUEUE
+		if not dore:
+			return
+	if toupie <= 0.0:
+		toupie = R.TETE_A_QUEUE * (Coupes.PEPIN_DORE_TOUPIE if dore else 1.0)
 		derapage = 0.0
 
 

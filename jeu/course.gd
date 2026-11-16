@@ -9,6 +9,8 @@ const Vehicules = preload("res://donnees/vehicules.gd")
 const Kart = preload("res://jeu/kart.gd")
 const Avion = preload("res://jeu/avion.gd")
 const R = preload("res://donnees/reglages.gd")
+const Coupes = preload("res://donnees/coupes.gd")
+const Coupe = preload("res://jeu/coupe.gd")
 
 const FLECHES := [KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT]
 const LETTRES := [KEY_W, KEY_S, KEY_A, KEY_D]  # Z Q S D sur un clavier français
@@ -43,6 +45,7 @@ var trace: Array = []    # Contre-la-montre : la course du joueur, notée dix fo
 var fantome: Array = []  # Contre-la-montre : la trace de sa meilleure course
 var fantome_visible: Node3D
 var record := -1.0
+var tenues: Array = []  # la skin de chaque joueur (numéro dans Coupes.SKINS)
 var ordis: Array = []   # Coupe : les adversaires imposés, [numéro du pilote, numéro du véhicule]
 
 
@@ -73,9 +76,19 @@ func demarrer(circuit: Dictionary, humains: Array, vehicules: Array = [], tours 
 		grille = ordis.map(func(o): return [o[0], false, Vehicules.VEHICULES[o[1]]])
 	for j in humains.size():
 		grille.append([humains[j], true, Vehicules.VEHICULES[vehicules[j] if j < vehicules.size() else 0]])
+	var joueur := 0
 	for n in grille.size():
 		var kart: Node3D = Avion.new() if aerien else Kart.new()
-		kart.preparer(Pilotes.PILOTES[grille[n][0]], piste, grille[n][1], grille[n][2])
+		var pilote: Dictionary = Pilotes.PILOTES[grille[n][0]]
+		if grille[n][1]:
+			# Les cadeaux des coupes : la skin, le sac de pépins, les pépins dorés.
+			pilote = Coupe.habiller(pilote, tenues[joueur] if joueur < tenues.size() else 0)
+			joueur += 1
+		kart.preparer(pilote, piste, grille[n][1], grille[n][2])
+		if grille[n][1]:
+			kart.dores = Coupe.cadeau_gagne("pepins_dores")
+			if Coupe.cadeau_gagne("sac"):
+				kart.pepins = Coupes.SAC_DE_PEPINS
 		add_child(kart)
 		if aerien:
 			kart.placer(-5.0 - (n >> 1) * 8.0, -4.0 if n % 2 == 0 else 4.0)
@@ -442,13 +455,21 @@ func _lancer_un_pepin(kart: Node3D) -> void:
 	forme.height = 0.6
 	var brun := StandardMaterial3D.new()
 	brun.albedo_color = Color("#4e342e")
+	if kart.dores:
+		# Un pépin doré : il brille, et il va plus vite.
+		brun.albedo_color = Color("#ffc107")
+		brun.metallic = 0.8
+		brun.roughness = 0.2
+		brun.emission_enabled = true
+		brun.emission = Color("#ff8f00")
 	var pepin := MeshInstance3D.new()
 	pepin.mesh = forme
 	pepin.material_override = brun
 	pepin.basis = Basis.looking_at(avant) * Basis.from_scale(Vector3(0.7, 0.7, 1.7))
 	pepin.position = kart.ou_suis_je() + avant * 2.2
 	add_child(pepin)
-	pepins.append({"noeud": pepin, "direction": avant, "vitesse": maxf(kart.vitesse, 0.0) + R.PEPIN_VITESSE, "vie": 2.5, "tireur": kart})
+	var vitesse: float = maxf(kart.vitesse, 0.0) + R.PEPIN_VITESSE + (Coupes.PEPIN_DORE_VITESSE if kart.dores else 0.0)
+	pepins.append({"noeud": pepin, "direction": avant, "vitesse": vitesse, "vie": 2.5, "tireur": kart, "dore": kart.dores})
 
 
 # Les pépins filent tout droit en suivant le sol, jusqu'à toucher un kart ou une barrière.
@@ -475,7 +496,7 @@ func _avancer_les_pepins(dt: float) -> void:
 			var ecart: Vector3 = kart.ou_suis_je() - la
 			# Un kart qui saute assez haut laisse passer le pépin sous lui.
 			if kart != p["tireur"] and Vector2(ecart.x, ecart.z).length() < (2.4 if aerien else 1.7) and absf(ecart.y) < (2.0 if aerien else 0.9):
-				kart.recevoir_pepin()
+				kart.recevoir_pepin(p["dore"])
 				p["tireur"].tirs += 1
 				if epreuve == "chasse":
 					kart.score = maxi(0, kart.score - R.CHASSE_PEPIN)

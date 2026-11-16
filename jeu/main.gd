@@ -28,7 +28,7 @@ const DISCRET := Color("#9aa6c7")
 
 var GRAS := FontVariation.new()  # la police des titres, en plus épais
 
-var choix := {"joueurs": 1, "pilotes": [0, 1], "vehicules": [0, 0], "circuit": 0, "tours": 3, "avions": false, "onglet": 0, "epreuve": 0, "skate": false, "planches": [0, 0], "coupe": 0}
+var choix := {"joueurs": 1, "pilotes": [0, 1], "vehicules": [0, 0], "circuit": 0, "tours": 3, "avions": false, "onglet": 0, "epreuve": 0, "skate": false, "planches": [0, 0], "coupe": 0, "skins": [0, 0]}
 var menu: Control
 var resultats: Control
 var course: Node
@@ -104,6 +104,8 @@ func _ready() -> void:
 			essai_coupe = option.trim_prefix("--essai-coupe").trim_prefix("=")
 			essai_coupe = "-" if essai_coupe == "" else essai_coupe
 			choix["epreuve"] = Modes.EPREUVES.map(func(e): return e["cle"]).find("coupe")
+		elif option.begins_with("--skin="):
+			choix["skins"] = [int(option.trim_prefix("--skin=")), int(option.trim_prefix("--skin=")) + 1]
 		elif option.begins_with("--coupe="):
 			choix["coupe"] = int(option.trim_prefix("--coupe="))
 		elif option == "--secret":
@@ -334,6 +336,9 @@ func _carte_du_joueur(parent: Control, j: int) -> void:
 	var carte := _carte(parent, "Joueur %d" % (j + 1) if choix["joueurs"] == 2 else "Ton pilote")
 	carte.get_parent().size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var pilote: Dictionary = Pilotes.PILOTES[choix["pilotes"][j]]
+	var avec_skins := Coupe.cadeau_gagne("skins")
+	if avec_skins:
+		pilote = Coupe.habiller(pilote, choix["skins"][j])
 	var vehicule: Dictionary = Vehicules.VEHICULES[choix["vehicules"][j]]
 	if choix["skate"]:
 		vehicule = S.PLANCHES[choix["planches"][j]]
@@ -343,6 +348,12 @@ func _carte_du_joueur(parent: Control, j: int) -> void:
 	_selecteur(carte, pilote["nom"], Color(pilote["couleur"]).lightened(0.35), 26,
 		func(): choix["pilotes"][j] = _pilote_voisin(choix["pilotes"][j], -1),
 		func(): choix["pilotes"][j] = _pilote_voisin(choix["pilotes"][j], 1))
+	if avec_skins:
+		# Un cadeau de la coupe : les skins changent les couleurs du pilote.
+		var skins := Coupes.SKINS.size()
+		_selecteur(carte, "Skin : " + Coupes.SKINS[choix["skins"][j]]["nom"], TEXTE, 18,
+			func(): choix["skins"][j] = (choix["skins"][j] + skins - 1) % skins,
+			func(): choix["skins"][j] = (choix["skins"][j] + 1) % skins)
 	if choix["skate"]:
 		# En skate, on choisit seulement sa planche : elles roulent toutes pareil.
 		var planches: int = S.PLANCHES.size()
@@ -832,11 +843,12 @@ func _lancer(demo: bool) -> void:
 		course.record = int(Defi.record("Skatepark").get("temps", 0))
 		add_child(course)
 		course.finie.connect(_montrer_resultats)
-		course.demarrer(humains, choix["planches"])
+		course.demarrer(humains, choix["planches"], _tenues(joueurs))
 		_jouer(S.MUSIQUE)
 		return
 	course = Course.new()
 	course.demo = demo or essai_coupe != ""
+	course.tenues = _tenues(joueurs)
 	add_child(course)
 	course.finie.connect(_montrer_resultats)
 	var circuit: Dictionary = Circuits.CIRCUITS[defi["circuit"] if not defi.is_empty() else choix["circuit"]]
@@ -867,6 +879,11 @@ func _lancer(demo: bool) -> void:
 	else:
 		course.demarrer(circuit, humains, vehicules, defi["tours"], en_avion, defi["regle"]["effet"])
 	_jouer(circuit.get("musique", ""))
+
+
+# Les skins des joueurs, si on les a gagnées.
+func _tenues(joueurs: int) -> Array:
+	return choix["skins"].slice(0, joueurs) if Coupe.cadeau_gagne("skins") else []
 
 
 # Un record par circuit, par mode (kart ou avion) et par nombre de tours.
@@ -1033,7 +1050,7 @@ func _fin_de_la_coupe() -> void:
 	resultats.add_child(centre)
 	var carte := _carte(centre, coupe["nom"] + ("  ·  avions" if choix["avions"] else "  ·  karts"))
 	carte.custom_minimum_size.x = 460
-	_texte(carte, "Classement final", 34, TEXTE, true)
+	_texte(carte, "Classement final", 28, TEXTE, true)
 	var place := 0
 	for i in noms.size():
 		var nom: String = noms[i]
@@ -1064,7 +1081,19 @@ func _fin_de_la_coupe() -> void:
 		_texte(carte, "+ %d graines  (tu en as %d)" % [graines, Magasin.graines()], 18, JAUNE, true).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var cadeau: Dictionary = coupe.get("cadeau", {})
 	if not deja_gagnee and Coupe.gagnee(coupe["nom"]) and not cadeau.is_empty():
-		_texte(carte, "Cadeau : tu as gagné " + Coupe.cadeau_en_mots(coupe) + " !", 22, JAUNE, true).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		var annonce := _texte(carte, "Cadeau : tu as gagné " + Coupe.cadeau_en_mots(coupe) + " !", 22, JAUNE, true)
+		annonce.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		annonce.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		var explications := {
+			"skins": "Choisis ta skin dans le menu, sous ton pilote.",
+			"sac": "Tu démarres chaque course avec %d pépins." % Coupes.SAC_DE_PEPINS,
+			"pepins_dores": "Tes pépins sont dorés : plus rapides, ils traversent les boucliers !",
+		}
+		for sorte in explications:
+			if cadeau.has(sorte):
+				var ligne := _texte(carte, explications[sorte], 16, TEXTE)
+				ligne.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+				ligne.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		var pilote: Dictionary = Pilotes.PILOTES[grand_prix["humains"][0]]
 		var vehicule: Dictionary = Vehicules.VEHICULES[0]
 		for p in Pilotes.PILOTES:
@@ -1073,9 +1102,11 @@ func _fin_de_la_coupe() -> void:
 		for v in Vehicules.VEHICULES:
 			if v["nom"] == cadeau.get("vehicule", ""):
 				vehicule = v
-		if cadeau.has("pilote") or cadeau.has("vehicule"):
+		if cadeau.has("skins"):
+			pilote = Coupe.habiller(pilote, 1)  # pour montrer une skin
+		if cadeau.has("pilote") or cadeau.has("vehicule") or cadeau.has("skins"):
 			_apercu(carte, pilote, vehicule, choix["avions"])
-			carte.get_child(carte.get_child_count() - 1).custom_minimum_size = Vector2(420, 150)
+			carte.get_child(carte.get_child_count() - 1).custom_minimum_size = Vector2(420, 110)
 
 	var boutons := HBoxContainer.new()
 	boutons.add_theme_constant_override("separation", 12)
